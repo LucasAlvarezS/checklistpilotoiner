@@ -259,7 +259,15 @@ export function ChecklistForm() {
                 >
                   <input
                     inputMode="numeric"
-                    {...register("revision")}
+                    pattern="[0-9]*"
+                    maxLength={3}
+                    {...register("revision", {
+                      onChange: (e) =>
+                        setValue(
+                          "revision",
+                          e.target.value.replace(/\D/g, "").slice(0, 3),
+                        ),
+                    })}
                     className="campo"
                     placeholder="Ej: 03"
                   />
@@ -277,7 +285,15 @@ export function ChecklistForm() {
                 >
                   <input
                     inputMode="numeric"
-                    {...register("codigo")}
+                    pattern="[0-9]*"
+                    maxLength={3}
+                    {...register("codigo", {
+                      onChange: (e) =>
+                        setValue(
+                          "codigo",
+                          e.target.value.replace(/\D/g, "").slice(0, 3),
+                        ),
+                    })}
                     className="campo"
                     placeholder="Ej: 04"
                   />

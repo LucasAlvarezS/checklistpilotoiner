@@ -22,7 +22,6 @@ export default async function Home() {
           <h1 className="mt-4 text-lg font-bold text-white">
             Checklist Inspecciones Externas
           </h1>
-          <p className="mt-1 text-sm text-[#bcd2d2]">Inspección RPA · OPE-PR-01</p>
         </div>
 
         {/* Acciones */}

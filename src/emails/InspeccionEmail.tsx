@@ -68,7 +68,6 @@ export function InspeccionEmail({
           <Section style={styles.header}>
             <Img src={logoUrl} alt="INER" height={40} style={{ margin: "0 auto" }} />
             <Text style={styles.headerTitle}>CHECKLIST INSPECCIONES EXTERNAS</Text>
-            <Text style={styles.headerSub}>Inspección RPA · OPE-PR-01</Text>
           </Section>
 
           {conforme ? (
