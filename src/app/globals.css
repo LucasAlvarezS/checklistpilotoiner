@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   Identidad visual INER
+   verde #044245 · gris #707070 · amarillo #FFA700
+   ============================================================ */
+@theme {
+  --color-iner-green: #044245;
+  --color-iner-green-700: #053538;
+  --color-iner-green-50: #e6efef;
+  --color-iner-gray: #707070;
+  --color-iner-gray-100: #f2f2f2;
+  --color-iner-amber: #ffa700;
+  --color-iner-amber-50: #fff6e5;
+
+  --color-background: #f4f6f6;
+  --color-foreground: #1a1f1f;
+
+  --font-sans: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* Mejor experiencia táctil en celular/tablet */
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@layer components {
+  .campo {
+    @apply w-full rounded-lg border border-black/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-iner-green focus:ring-2 focus:ring-iner-green/30;
+  }
+  .btn-primary {
+    @apply rounded-lg bg-iner-green px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-iner-green-700 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-secondary {
+    @apply rounded-lg border border-iner-green/30 bg-white px-4 py-3 text-sm font-bold text-iner-green transition hover:bg-iner-green-50 disabled:opacity-60;
+  }
 }

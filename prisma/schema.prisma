@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum EstadoInspeccion {
+  COMPLETA_SI
+  CON_OBSERVACIONES
+}
+
+enum ValorRespuesta {
+  SI
+  NO
+  NA
+}
+
+model Inspeccion {
+  id              String           @id @default(uuid())
+  creadoEn        DateTime         @default(now())
+  fechaInspeccion DateTime
+  pilotoNombre    String
+  parqueNombre    String
+  equipoRPA       String
+  estado          EstadoInspeccion
+  pdfPath         String?
+  respuestas      Respuesta[]
+
+  @@index([creadoEn])
+  @@index([fechaInspeccion])
+  @@index([parqueNombre])
+  @@index([pilotoNombre])
+}
+
+model Respuesta {
+  id           String         @id @default(uuid())
+  inspeccion   Inspeccion     @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
+  inspeccionId String
+  etapa        String
+  seccion      String
+  numero       String
+  item         String
+  valor        ValorRespuesta
+  observacion  String?
+
+  @@index([inspeccionId])
+}
