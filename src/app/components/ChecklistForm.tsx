@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,8 @@ export function ChecklistForm() {
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [irAEnviar, setIrAEnviar] = useState(false);
+  const enviarRef = useRef<HTMLButtonElement>(null);
 
   const metodos = useForm<InspeccionInput>({
     resolver: zodResolver(inspeccionSchema),
@@ -49,7 +51,7 @@ export function ChecklistForm() {
     mode: "onTouched",
   });
 
-  const { control, handleSubmit, trigger, register, formState } = metodos;
+  const { control, handleSubmit, trigger, register, setValue, formState } = metodos;
   const respuestas = useWatch({ control, name: "respuestas" });
 
   const { respondidos, sies, noes, nas, itemsNo } = useMemo(() => {
@@ -81,6 +83,26 @@ export function ChecklistForm() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
+  // Marca todos los ítems en SÍ y lleva directo al botón de enviar.
+  const marcarTodoSi = () => {
+    for (const it of ITEMS_PLANOS) {
+      setValue(`respuestas.${it.id}.valor`, "SI", { shouldDirty: true });
+    }
+    setIrAEnviar(true);
+    setPaso(2);
+  };
+
+  // Al llegar al resumen tras "Marcar todo en SÍ", baja hasta el botón de enviar.
+  useEffect(() => {
+    if (paso === 2 && irAEnviar) {
+      const t = setTimeout(() => {
+        enviarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setIrAEnviar(false);
+      }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [paso, irAEnviar]);
 
   const onValid = async (data: InspeccionInput) => {
     setEnviando(true);
@@ -220,6 +242,19 @@ export function ChecklistForm() {
         {/* PASO 2 — Checklist */}
         {paso === 1 && (
           <section className="space-y-4">
+            <div className="rounded-xl border border-iner-green/30 bg-iner-green-50 p-4">
+              <button
+                type="button"
+                onClick={marcarTodoSi}
+                className="btn-primary w-full"
+              >
+                ✓ Marcar todo en SÍ
+              </button>
+              <p className="mt-2 text-center text-xs text-iner-gray">
+                Marca todos los ítems en SÍ y te lleva al botón de enviar. Puedes volver
+                y ajustar cualquier ítem si es necesario.
+              </p>
+            </div>
             {CHECKLIST.map((etapa) => (
               <div
                 key={etapa.id}
@@ -312,6 +347,7 @@ export function ChecklistForm() {
                 Volver
               </button>
               <button
+                ref={enviarRef}
                 type="button"
                 onClick={handleSubmit(onValid, onInvalid)}
                 className="btn-primary flex-1"
