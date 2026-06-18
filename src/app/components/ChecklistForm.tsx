@@ -12,7 +12,9 @@ import {
   type Valor,
 } from "@/lib/checklist-schema";
 import { inspeccionSchema, type InspeccionInput } from "@/lib/validation";
+import { normalizarNumero } from "@/lib/inspeccion";
 import { ItemRow } from "./ItemRow";
+import { IconCheck } from "./icons";
 
 const PASOS = ["Datos", "Checklist", "Enviar"] as const;
 
@@ -30,6 +32,8 @@ function valoresIniciales(): InspeccionInput {
   }
   return {
     fechaInspeccion: hoyLocal(),
+    revision: "",
+    codigo: "",
     pilotoNombre: "",
     parqueNombre: "",
     equipoRPA: "",
@@ -42,8 +46,8 @@ export function ChecklistForm() {
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
-  const [irAEnviar, setIrAEnviar] = useState(false);
-  const enviarRef = useRef<HTMLButtonElement>(null);
+  const [disp, setDisp] = useState<{ usados: string[]; siguiente: string } | null>(null);
+  const finRef = useRef<HTMLDivElement>(null);
 
   const metodos = useForm<InspeccionInput>({
     resolver: zodResolver(inspeccionSchema),
@@ -51,8 +55,43 @@ export function ChecklistForm() {
     mode: "onTouched",
   });
 
-  const { control, handleSubmit, trigger, register, setValue, formState } = metodos;
+  const { control, handleSubmit, trigger, register, setValue, getValues, formState } =
+    metodos;
   const respuestas = useWatch({ control, name: "respuestas" });
+  const revision = useWatch({ control, name: "revision" });
+  const codigo = useWatch({ control, name: "codigo" });
+
+  // Consulta los códigos disponibles para la revisión ingresada (debounced).
+  useEffect(() => {
+    const rev = (revision ?? "").trim();
+    if (!/^\d{1,3}$/.test(rev)) {
+      setDisp(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/disponibilidad?revision=${rev}`, {
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        setDisp(json);
+        // Pre-rellena el código con el siguiente disponible si está vacío.
+        if (!(getValues("codigo") ?? "").trim()) {
+          setValue("codigo", json.siguiente);
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 350);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [revision, getValues, setValue]);
+
+  const codigoNorm = normalizarNumero(codigo ?? "");
+  const codigoTomado = Boolean(disp && codigoNorm && disp.usados.includes(codigoNorm));
 
   const { respondidos, sies, noes, nas, itemsNo } = useMemo(() => {
     let sies = 0,
@@ -74,35 +113,43 @@ export function ChecklistForm() {
   const irAChecklist = async () => {
     const ok = await trigger([
       "fechaInspeccion",
+      "revision",
+      "codigo",
       "pilotoNombre",
       "parqueNombre",
       "equipoRPA",
     ]);
-    if (ok) {
-      setPaso(1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!ok) return;
+
+    // Verificación de disponibilidad EN EL MOMENTO (no depende del estado con debounce).
+    const rev = normalizarNumero(getValues("revision"));
+    const cod = normalizarNumero(getValues("codigo"));
+    try {
+      const res = await fetch(`/api/disponibilidad?revision=${rev}`);
+      const data = await res.json();
+      setDisp(data); // refresca el estado → el aviso inline se actualiza
+      if (Array.isArray(data.usados) && data.usados.includes(cod)) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return; // código no disponible → no permite comenzar
+      }
+    } catch {
+      /* si la verificación falla, el servidor igual rechaza con 409 al enviar */
     }
+
+    setPaso(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Marca todos los ítems en SÍ y lleva directo al botón de enviar.
+  // Marca todos los ítems en SÍ y baja hasta el final del checklist (sin salir del paso,
+  // para que el piloto pueda seguir editando cualquier ítem si lo necesita).
   const marcarTodoSi = () => {
     for (const it of ITEMS_PLANOS) {
       setValue(`respuestas.${it.id}.valor`, "SI", { shouldDirty: true });
     }
-    setIrAEnviar(true);
-    setPaso(2);
+    setTimeout(() => {
+      finRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
   };
-
-  // Al llegar al resumen tras "Marcar todo en SÍ", baja hasta el botón de enviar.
-  useEffect(() => {
-    if (paso === 2 && irAEnviar) {
-      const t = setTimeout(() => {
-        enviarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        setIrAEnviar(false);
-      }, 120);
-      return () => clearTimeout(t);
-    }
-  }, [paso, irAEnviar]);
 
   const onValid = async (data: InspeccionInput) => {
     setEnviando(true);
@@ -114,6 +161,13 @@ export function ChecklistForm() {
         body: JSON.stringify(data),
       });
       const json = await res.json();
+      if (res.status === 409 && json?.codigoNoDisponible) {
+        setEnviando(false);
+        setPaso(0);
+        setErrorEnvio(json.error);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
       if (!res.ok && res.status !== 207) {
         throw new Error(json?.error ?? "No se pudo enviar la inspección.");
       }
@@ -198,6 +252,48 @@ export function ChecklistForm() {
                   className="campo"
                 />
               </Campo>
+              <div className="grid grid-cols-2 gap-4">
+                <Campo
+                  label="Revisión"
+                  error={formState.errors.revision?.message}
+                >
+                  <input
+                    inputMode="numeric"
+                    {...register("revision")}
+                    className="campo"
+                    placeholder="Ej: 03"
+                  />
+                </Campo>
+                <Campo
+                  label="Código OPE-PR-"
+                  error={
+                    formState.errors.codigo?.message ??
+                    (codigoTomado
+                      ? `OPE-PR-${codigoNorm} ya usado en la revisión ${normalizarNumero(
+                          revision ?? "",
+                        )}. Disponible: OPE-PR-${disp?.siguiente}`
+                      : undefined)
+                  }
+                >
+                  <input
+                    inputMode="numeric"
+                    {...register("codigo")}
+                    className="campo"
+                    placeholder="Ej: 04"
+                  />
+                </Campo>
+              </div>
+              {disp && !codigoTomado && (
+                <p className="-mt-2 text-xs text-iner-gray">
+                  {disp.usados.length > 0
+                    ? `Códigos usados en la revisión ${normalizarNumero(revision ?? "")}: ${disp.usados
+                        .map((c) => `OPE-PR-${c}`)
+                        .join(", ")}. `
+                    : ""}
+                  Disponible:{" "}
+                  <strong className="text-iner-green">OPE-PR-{disp.siguiente}</strong>
+                </p>
+              )}
               <Campo
                 label="Nombre del piloto"
                 error={formState.errors.pilotoNombre?.message}
@@ -233,9 +329,20 @@ export function ChecklistForm() {
                 Estos datos se incluirán en el formato PDF del checklist.
               </p>
             </div>
-            <button type="button" onClick={irAChecklist} className="btn-primary mt-5 w-full">
+            <button
+              type="button"
+              onClick={irAChecklist}
+              disabled={codigoTomado}
+              className="btn-primary mt-5 w-full"
+            >
               Comenzar checklist
             </button>
+            {codigoTomado && (
+              <p className="mt-2 text-center text-xs font-medium text-red-600">
+                El código OPE-PR-{codigoNorm} no está disponible para la revisión{" "}
+                {normalizarNumero(revision ?? "")}. Usa OPE-PR-{disp?.siguiente}.
+              </p>
+            )}
           </section>
         )}
 
@@ -246,13 +353,14 @@ export function ChecklistForm() {
               <button
                 type="button"
                 onClick={marcarTodoSi}
-                className="btn-primary w-full"
+                className="btn-primary inline-flex w-full items-center justify-center gap-2"
               >
-                ✓ Marcar todo en SÍ
+                <IconCheck size={18} />
+                Marcar todo en SÍ
               </button>
               <p className="mt-2 text-center text-xs text-iner-gray">
-                Marca todos los ítems en SÍ y te lleva al botón de enviar. Puedes volver
-                y ajustar cualquier ítem si es necesario.
+                Marca todos los ítems en SÍ. Puedes seguir revisando y ajustar cualquier
+                ítem antes de continuar.
               </p>
             </div>
             {CHECKLIST.map((etapa) => (
@@ -278,7 +386,7 @@ export function ChecklistForm() {
                 </div>
               </div>
             ))}
-            <div className="flex gap-3">
+            <div ref={finRef} className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setPaso(0)}
@@ -331,8 +439,9 @@ export function ChecklistForm() {
               </div>
             ) : (
               respondidos === TOTAL_ITEMS && (
-                <div className="mb-4 rounded-lg border border-iner-green/30 bg-iner-green-50 p-3 text-sm font-semibold text-iner-green">
-                  ✓ Todas las casillas marcadas, sin observaciones.
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-iner-green/30 bg-iner-green-50 p-3 text-sm font-semibold text-iner-green">
+                  <IconCheck size={18} />
+                  Todas las casillas marcadas, sin observaciones.
                 </div>
               )
             )}
@@ -347,7 +456,6 @@ export function ChecklistForm() {
                 Volver
               </button>
               <button
-                ref={enviarRef}
                 type="button"
                 onClick={handleSubmit(onValid, onInvalid)}
                 className="btn-primary flex-1"

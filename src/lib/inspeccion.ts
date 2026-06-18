@@ -93,6 +93,22 @@ export function fechaDesdeInput(s: string): Date {
   return new Date(`${s}T12:00:00`);
 }
 
+/** Normaliza un número (código/revisión) a 2 dígitos: "4" -> "04". */
+export function normalizarNumero(s: string): string {
+  const n = (s ?? "").trim().replace(/\D/g, "");
+  if (!n) return "";
+  return n.padStart(2, "0");
+}
+
+/** Siguiente código disponible para una revisión: mayor usado + 1 (o "01"). */
+export function siguienteCodigo(usados: string[]): string {
+  const max = usados.reduce(
+    (m, c) => Math.max(m, parseInt(c, 10) || 0),
+    0,
+  );
+  return String(max + 1).padStart(2, "0");
+}
+
 /** Nombre de archivo del PDF: Checklist_<Parque>_<Piloto>_<YYYY-MM-DD_HHmm>.pdf */
 export function nombrePdf(
   parque: string,

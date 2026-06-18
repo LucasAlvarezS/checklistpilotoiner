@@ -23,6 +23,8 @@ model Inspeccion {
   id              String           @id @default(uuid())
   creadoEn        DateTime         @default(now())
   fechaInspeccion DateTime
+  codigo          String
+  revision        String
   pilotoNombre    String
   parqueNombre    String
   equipoRPA       String
@@ -30,6 +32,7 @@ model Inspeccion {
   pdfPath         String?
   respuestas      Respuesta[]
 
+  @@unique([revision, codigo])
   @@index([creadoEn])
   @@index([fechaInspeccion])
   @@index([parqueNombre])

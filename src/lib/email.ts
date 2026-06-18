@@ -36,8 +36,8 @@ export async function enviarCorreoInspeccion(args: EnviarCorreoArgs) {
 
   const conforme = args.estado === "COMPLETA_SI";
   const subject = conforme
-    ? `✓ Checklist conforme — ${args.parqueNombre} · ${args.pilotoNombre}`
-    : `⚠ Checklist CON OBSERVACIONES (${args.resumen.totalNo}) — ${args.parqueNombre} · ${args.pilotoNombre}`;
+    ? `Checklist conforme — ${args.parqueNombre} · ${args.pilotoNombre}`
+    : `Checklist CON OBSERVACIONES (${args.resumen.totalNo}) — ${args.parqueNombre} · ${args.pilotoNombre}`;
 
   const { data, error } = await resend.emails.send({
     from,

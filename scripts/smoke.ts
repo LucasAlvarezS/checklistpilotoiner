@@ -24,6 +24,8 @@ ITEMS_PLANOS.forEach((it, i) => {
 const hoy = new Date().toISOString().slice(0, 10);
 const payload = {
   fechaInspeccion: hoy,
+  revision: "03",
+  codigo: process.argv[3] ?? "01",
   pilotoNombre: conObs ? "Piloto Prueba (con obs)" : "Piloto Prueba",
   parqueNombre: "Parque Demo Norte",
   equipoRPA: "DJI Matrice 300",

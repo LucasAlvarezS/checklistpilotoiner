@@ -7,6 +7,8 @@ import {
 } from "./inspeccion";
 
 interface DatosPdf {
+  codigo: string;
+  revision: string;
   pilotoNombre: string;
   parqueNombre: string;
   equipoRPA: string;
@@ -82,7 +84,8 @@ function construirCuerpo(filas: FilaResultado[]): string {
 }
 
 // Encabezado del documento — se repite en cada página (display: table-header-group).
-const headerDoc = `
+// Código, revisión y fecha los define el piloto (la fecha es la de la inspección).
+const headerDoc = (meta: { codigo: string; revision: string; fechaTexto: string }) => `
 <div class="doc-header">
   <table class="hmain">
     <tr>
@@ -90,9 +93,9 @@ const headerDoc = `
       <td class="htitle">Procedimiento trabajo aéreo</td>
       <td class="hmeta">
         <table class="hmeta-t">
-          <tr><td>Código</td><td>OPE-PR-01</td></tr>
-          <tr><td colspan="2">Revisión 03</td></tr>
-          <tr><td>Fecha</td><td><b>15 octubre 2023</b></td></tr>
+          <tr><td>Código</td><td>OPE-PR-${esc(meta.codigo)}</td></tr>
+          <tr><td colspan="2">Revisión ${esc(meta.revision)}</td></tr>
+          <tr><td>Fecha</td><td><b>${esc(meta.fechaTexto)}</b></td></tr>
         </table>
       </td>
     </tr>
@@ -137,8 +140,8 @@ function construirHtml(datos: DatosPdf): string {
   /* Encabezado */
   table.hmain { width: 100%; border-collapse: collapse; }
   table.hmain > tr > td, .hmain td { border: 1px solid #000; }
-  .hlogo { width: 150px; text-align: center; padding: 4px; vertical-align: middle; }
-  .hlogo img { height: 52px; }
+  .hlogo { width: 168px; text-align: center; padding: 5px; vertical-align: middle; }
+  .hlogo img { height: 66px; }
   .htitle { text-align: center; font-weight: bold; font-size: 17px; vertical-align: middle; }
   .hmeta { width: 185px; padding: 0; vertical-align: top; }
   .hmeta-t { width: 100%; border-collapse: collapse; font-size: 9px; }
@@ -157,13 +160,14 @@ function construirHtml(datos: DatosPdf): string {
   table.cab .k { background: ${C.cream}; font-weight: bold; width: 15%; }
 
   /* Tabla del checklist */
-  table.chk { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.chk { width: 100%; border-collapse: collapse; table-layout: fixed;
+              border: 1px solid #000; }
   table.chk td { border: 1px solid #000; padding: 3px 6px; vertical-align: middle;
                  word-wrap: break-word; }
   col.c-num { width: 6%; }
-  col.c-item { width: 57%; }
+  col.c-item { width: 56%; }
   col.c-ck { width: 7%; }
-  col.c-obs { width: 23%; }
+  col.c-obs { width: 22%; }
 
   .titulo { text-align: center; font-weight: bold; background: #fff; }
   .proc { text-align: center; font-weight: bold; background: ${C.cream};
@@ -180,7 +184,11 @@ function construirHtml(datos: DatosPdf): string {
 </style></head>
 <body>
   <table class="page">
-    <thead><tr><td>${headerDoc}</td></tr></thead>
+    <thead><tr><td>${headerDoc({
+      codigo: datos.codigo,
+      revision: datos.revision,
+      fechaTexto: formatearFechaSolo(datos.fecha),
+    })}</td></tr></thead>
     <tfoot><tr><td>${footerDoc}</td></tr></tfoot>
     <tbody><tr><td>
       <h2 class="tit">CHECKLIST INSPECCIONES EXTERNAS</h2>

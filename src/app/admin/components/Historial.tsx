@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  IconAlert,
+  IconCheck,
+  IconDocument,
+  IconDownload,
+  IconMail,
+  IconTrash,
+} from "@/app/components/icons";
 
 interface Item {
   id: string;
@@ -48,6 +56,7 @@ export function Historial() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [reenviando, setReenviando] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState<string | null>(null);
 
   const cargar = useCallback(async (f: Filtros) => {
     setCargando(true);
@@ -95,6 +104,29 @@ export function Historial() {
       setError(e instanceof Error ? e.message : "Error al reenviar.");
     } finally {
       setReenviando(null);
+    }
+  };
+
+  const eliminar = async (item: Item) => {
+    const ok = window.confirm(
+      `¿Eliminar definitivamente la inspección de ${item.parqueNombre} (${item.pilotoNombre})? Se borrará el informe y todas sus respuestas. Esta acción no se puede deshacer.`,
+    );
+    if (!ok) return;
+    setEliminando(item.id);
+    setAviso(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/inspecciones/${item.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error ?? "No se pudo eliminar.");
+      setItems((prev) => prev.filter((i) => i.id !== item.id));
+      setAviso("Inspección eliminada correctamente.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al eliminar.");
+    } finally {
+      setEliminando(null);
     }
   };
 
@@ -169,9 +201,10 @@ export function Historial() {
         </p>
         <a
           href={`/api/admin/inspecciones/export?${toQuery(filtros)}`}
-          className="rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50"
         >
-          ⬇ Exportar CSV
+          <IconDownload size={14} />
+          Exportar CSV
         </a>
       </div>
 
@@ -210,7 +243,13 @@ export function Historial() {
                   <EstadoBadge estado={i.estado} totalNo={i.totalNo} />
                 </td>
                 <td className="px-4 py-3">
-                  <Acciones item={i} reenviando={reenviando === i.id} onReenviar={reenviar} />
+                  <Acciones
+                    item={i}
+                    reenviando={reenviando === i.id}
+                    eliminando={eliminando === i.id}
+                    onReenviar={reenviar}
+                    onEliminar={eliminar}
+                  />
                 </td>
               </tr>
             ))}
@@ -240,7 +279,13 @@ export function Historial() {
               {fmtFecha(i.fechaInspeccion)} · {i.equipoRPA}
             </p>
             <div className="mt-3">
-              <Acciones item={i} reenviando={reenviando === i.id} onReenviar={reenviar} />
+              <Acciones
+                item={i}
+                reenviando={reenviando === i.id}
+                eliminando={eliminando === i.id}
+                onReenviar={reenviar}
+                onEliminar={eliminar}
+              />
             </div>
           </div>
         ))}
@@ -261,14 +306,16 @@ function EstadoBadge({
 }) {
   if (estado === "CON_OBSERVACIONES") {
     return (
-      <span className="inline-block rounded-full bg-iner-amber-50 px-2.5 py-1 text-xs font-semibold text-[#9a6200]">
-        ⚠ {totalNo} en NO
+      <span className="inline-flex items-center gap-1 rounded-full bg-iner-amber-50 px-2.5 py-1 text-xs font-semibold text-[#9a6200]">
+        <IconAlert size={13} />
+        {totalNo} en NO
       </span>
     );
   }
   return (
-    <span className="inline-block rounded-full bg-iner-green-50 px-2.5 py-1 text-xs font-semibold text-iner-green">
-      ✓ Conforme
+    <span className="inline-flex items-center gap-1 rounded-full bg-iner-green-50 px-2.5 py-1 text-xs font-semibold text-iner-green">
+      <IconCheck size={13} />
+      Conforme
     </span>
   );
 }
@@ -276,11 +323,15 @@ function EstadoBadge({
 function Acciones({
   item,
   reenviando,
+  eliminando,
   onReenviar,
+  onEliminar,
 }: {
   item: Item;
   reenviando: boolean;
+  eliminando: boolean;
   onReenviar: (id: string) => void;
+  onEliminar: (item: Item) => void;
 }) {
   return (
     <div className="flex flex-wrap justify-end gap-2">
@@ -289,9 +340,10 @@ function Acciones({
           href={`/api/admin/inspecciones/${item.id}/pdf`}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50"
         >
-          📄 Ver PDF
+          <IconDocument size={14} />
+          Ver PDF
         </a>
       ) : (
         <span className="rounded-md border border-black/10 px-3 py-1.5 text-xs text-iner-gray">
@@ -301,10 +353,20 @@ function Acciones({
       <button
         type="button"
         onClick={() => onReenviar(item.id)}
-        disabled={reenviando || !item.tienePdf}
-        className="rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50 disabled:opacity-50"
+        disabled={reenviando || eliminando || !item.tienePdf}
+        className="inline-flex items-center gap-1.5 rounded-md border border-iner-green/30 px-3 py-1.5 text-xs font-semibold text-iner-green transition hover:bg-iner-green-50 disabled:opacity-50"
       >
-        {reenviando ? "Enviando…" : "✉ Reenviar"}
+        <IconMail size={14} />
+        {reenviando ? "Enviando…" : "Reenviar"}
+      </button>
+      <button
+        type="button"
+        onClick={() => onEliminar(item)}
+        disabled={eliminando || reenviando}
+        className="inline-flex items-center gap-1.5 rounded-md border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+      >
+        <IconTrash size={14} />
+        {eliminando ? "Eliminando…" : "Eliminar"}
       </button>
     </div>
   );

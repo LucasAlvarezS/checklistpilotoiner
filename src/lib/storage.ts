@@ -42,3 +42,9 @@ export async function descargarPdf(path: string): Promise<Buffer> {
   }
   return Buffer.from(await data.arrayBuffer());
 }
+
+/** Elimina el PDF del bucket. */
+export async function eliminarPdf(path: string): Promise<void> {
+  const { error } = await getClient().storage.from(BUCKET).remove([path]);
+  if (error) throw new Error(`Storage remove: ${error.message}`);
+}

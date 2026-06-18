@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { IconInstall } from "./icons";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -56,7 +57,8 @@ export function InstallButton() {
         }}
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-iner-amber bg-iner-amber-50 px-4 py-2.5 text-sm font-semibold text-[#9a6200] transition hover:bg-iner-amber/20"
       >
-        ⬇ Instalar app en el dispositivo
+        <IconInstall size={16} />
+        Instalar app en el dispositivo
       </button>
     );
   }

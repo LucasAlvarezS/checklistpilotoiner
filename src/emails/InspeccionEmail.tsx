@@ -74,13 +74,13 @@ export function InspeccionEmail({
           {conforme ? (
             <Section style={{ ...styles.banner, ...styles.bannerOk }}>
               <Text style={styles.bannerTextOk}>
-                ✓ Checklist completado — todas las casillas en SÍ
+                Checklist completado — todas las casillas en SÍ
               </Text>
             </Section>
           ) : (
             <Section style={{ ...styles.banner, ...styles.bannerWarn }}>
               <Text style={styles.bannerTextWarn}>
-                ⚠ Inspección con observaciones — {totalNo}{" "}
+                Inspección con observaciones — {totalNo}{" "}
                 {totalNo === 1 ? "ítem marcado" : "ítems marcados"} en NO
               </Text>
             </Section>

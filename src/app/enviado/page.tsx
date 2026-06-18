@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { IconAlert, IconCheck, IconMail } from "../components/icons";
 
 export default async function EnviadoPage({
   searchParams,
@@ -23,13 +24,13 @@ export default async function EnviadoPage({
         />
 
         <div
-          className={`mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+          className={`mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-full ${
             conObservaciones
               ? "bg-iner-amber-50 text-iner-amber"
               : "bg-iner-green-50 text-iner-green"
           }`}
         >
-          {conObservaciones ? "⚠" : "✓"}
+          {conObservaciones ? <IconAlert size={32} /> : <IconCheck size={32} />}
         </div>
 
         <h1 className="mt-4 text-xl font-bold text-iner-green">
@@ -42,14 +43,15 @@ export default async function EnviadoPage({
         </p>
 
         <div
-          className={`mt-4 rounded-lg px-4 py-2 text-sm font-medium ${
+          className={`mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
             correoEnviado
               ? "bg-iner-green-50 text-iner-green"
               : "bg-red-50 text-red-700"
           }`}
         >
+          {correoEnviado && <IconMail size={16} />}
           {correoEnviado
-            ? "✉ Correo enviado al supervisor con el PDF adjunto."
+            ? "Correo enviado al supervisor con el PDF adjunto."
             : "La inspección se guardó, pero el correo no pudo enviarse. Avisa al administrador."}
         </div>
 
