@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth, signIn, signOut } from "@/auth";
+import { InstallButton } from "./components/InstallButton";
 
 export default async function Home() {
   const session = await auth();
@@ -81,6 +82,8 @@ export default async function Home() {
           <p className="mt-2 text-center text-xs text-iner-gray">
             Completa el checklist de inspección en terreno.
           </p>
+
+          <InstallButton />
         </div>
 
         <p className="mt-4 text-center text-xs text-iner-gray">
