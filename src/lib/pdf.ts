@@ -30,8 +30,15 @@ const esc = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+// Check dibujado como SVG (vector). No depende de fuentes del sistema, por lo que
+// se ve igual en local y en el Chromium serverless de Vercel (@sparticuz/chromium).
+const CHECK_SVG =
+  '<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:middle">' +
+  '<path d="M20 6 9 17l-5-5" fill="none" stroke="#044245" stroke-width="3.5" ' +
+  'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 const marca = (valor: Valor, objetivo: Valor) =>
-  valor === objetivo ? "✔" : "";
+  valor === objetivo ? CHECK_SVG : "";
 
 function construirCuerpo(filas: FilaResultado[]): string {
   const mapa = new Map(filas.map((f) => [f.id, f]));
