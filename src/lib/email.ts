@@ -1,12 +1,12 @@
 import { Resend } from "resend";
 import { InspeccionEmail, type ItemNo } from "@/emails/InspeccionEmail";
 import type { EstadoInspeccion, ResumenInspeccion } from "./inspeccion";
-import { LOGO_MONO_DATA_URI } from "./assets";
+import { LOGO_CORREO_DATA_URI } from "./assets";
 
-// El logo (versión monocromática blanca, para la cabecera verde) se adjunta inline
+// El logo (versión monocromática ámbar oficial, para la cabecera verde) se adjunta inline
 // vía CID para que se vea en cualquier cliente de correo, sin depender de una URL pública.
 const LOGO_CID = "logo-iner";
-const LOGO_BUFFER = Buffer.from(LOGO_MONO_DATA_URI.split(",")[1], "base64");
+const LOGO_BUFFER = Buffer.from(LOGO_CORREO_DATA_URI.split(",")[1], "base64");
 
 interface EnviarCorreoArgs {
   pilotoNombre: string;
