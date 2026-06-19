@@ -23,9 +23,13 @@ interface EnviarCorreoArgs {
 export async function enviarCorreoInspeccion(args: EnviarCorreoArgs) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.MAIL_FROM;
-  const to = process.env.MAIL_TO_SUPERVISOR;
+  // MAIL_TO_SUPERVISOR admite uno o varios correos separados por coma.
+  const to = (process.env.MAIL_TO_SUPERVISOR ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
 
-  if (!apiKey || !from || !to) {
+  if (!apiKey || !from || to.length === 0) {
     throw new Error(
       "Faltan variables de entorno de correo (RESEND_API_KEY, MAIL_FROM, MAIL_TO_SUPERVISOR).",
     );
@@ -41,7 +45,7 @@ export async function enviarCorreoInspeccion(args: EnviarCorreoArgs) {
 
   const { data, error } = await resend.emails.send({
     from,
-    to: [to],
+    to,
     subject,
     react: InspeccionEmail({
       pilotoNombre: args.pilotoNombre,
