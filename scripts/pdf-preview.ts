@@ -12,8 +12,6 @@ async function main() {
   });
   const filas = construirFilas(respuestas);
   const pdf = await generarPdf({
-    codigo: "04",
-    revision: "03",
     pilotoNombre: "Juan Pérez",
     parqueNombre: "Parque Eólico Norte",
     equipoRPA: "DJI Matrice 300",

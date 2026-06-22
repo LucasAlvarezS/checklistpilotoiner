@@ -20,14 +20,6 @@ export const inspeccionSchema = z
     fechaInspeccion: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de la inspección"),
-    revision: z
-      .string()
-      .trim()
-      .regex(/^\d{1,3}$/, "Ingresa el número de revisión"),
-    codigo: z
-      .string()
-      .trim()
-      .regex(/^\d{1,3}$/, "Ingresa el número de código (OPE-PR)"),
     pilotoNombre: z.string().trim().min(1, "Ingresa el nombre del piloto"),
     parqueNombre: z.string().trim().min(1, "Ingresa el nombre del parque"),
     equipoRPA: z.string().trim().min(1, "Ingresa el equipo / RPA"),

@@ -9,12 +9,10 @@ import {
   formatearFechaSolo,
   fechaDesdeInput,
   nombrePdf,
-  normalizarNumero,
 } from "@/lib/inspeccion";
 import { generarPdf } from "@/lib/pdf";
 import { enviarCorreoInspeccion } from "@/lib/email";
 import { subirPdf, storageDisponible } from "@/lib/storage";
-import { Prisma } from "@prisma/client";
 
 // La generación de PDF con Chromium requiere runtime Node (no Edge).
 export const runtime = "nodejs";
@@ -48,8 +46,6 @@ export async function POST(req: Request) {
   const parqueNombre = parsed.data.parqueNombre;
   const equipoRPA = parsed.data.equipoRPA;
   const fecha = fechaDesdeInput(fechaInspeccion); // fecha de operación (la ingresa el piloto)
-  const codigo = normalizarNumero(parsed.data.codigo);
-  const revision = normalizarNumero(parsed.data.revision);
 
   const filas = construirFilas(respuestas);
   const estado = calcularEstado(filas);
@@ -62,8 +58,6 @@ export async function POST(req: Request) {
     const inspeccion = await prisma.inspeccion.create({
       data: {
         fechaInspeccion: fecha,
-        codigo,
-        revision,
         pilotoNombre,
         parqueNombre,
         equipoRPA,
@@ -82,17 +76,6 @@ export async function POST(req: Request) {
     });
     inspeccionId = inspeccion.id;
   } catch (e) {
-    // Par (revisión, código) duplicado → no disponible.
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json(
-        {
-          ok: false,
-          codigoNoDisponible: true,
-          error: `El código OPE-PR-${codigo} ya fue usado para la revisión ${revision}. Elige otro código.`,
-        },
-        { status: 409 },
-      );
-    }
     console.error("Error al guardar la inspección:", e);
     return NextResponse.json(
       { ok: false, error: "No se pudo guardar la inspección." },
@@ -105,8 +88,6 @@ export async function POST(req: Request) {
   const archivoPdf = nombrePdf(parqueNombre, pilotoNombre, fecha);
   try {
     const pdf = await generarPdf({
-      codigo,
-      revision,
       pilotoNombre,
       parqueNombre,
       equipoRPA,

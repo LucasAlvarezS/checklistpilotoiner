@@ -12,6 +12,8 @@ export type Valor = "SI" | "NO" | "NA";
 export interface Item {
   id: string;
   texto: string;
+  /** Ítem crítico (regulatorio): se resalta en rojo en el informe, como en el original. */
+  critico?: boolean;
 }
 
 export interface Subseccion {
@@ -267,6 +269,12 @@ const RAW: RawEtapa[] = [
   },
 ];
 
+// Ítems críticos (regulatorios) que el formato original resalta en rojo.
+const ITEMS_CRITICOS = new Set([
+  "Autorización de Operación otorgada por la ANAC",
+  "Avisar a ANAC término de Operación",
+]);
+
 export const CHECKLIST: Etapa[] = RAW.map((etapa, ei) => ({
   id: etapa.id,
   titulo: etapa.titulo,
@@ -276,6 +284,7 @@ export const CHECKLIST: Etapa[] = RAW.map((etapa, ei) => ({
     items: sub.items.map((texto, ii) => ({
       id: `${etapa.id}-${si}-${ii}`,
       texto,
+      critico: ITEMS_CRITICOS.has(texto),
     })),
   })),
 }));

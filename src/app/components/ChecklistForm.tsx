@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,6 @@ import {
   type Valor,
 } from "@/lib/checklist-schema";
 import { inspeccionSchema, type InspeccionInput } from "@/lib/validation";
-import { normalizarNumero } from "@/lib/inspeccion";
 import { ItemRow } from "./ItemRow";
 import { IconCheck } from "./icons";
 
@@ -32,8 +31,6 @@ function valoresIniciales(): InspeccionInput {
   }
   return {
     fechaInspeccion: hoyLocal(),
-    revision: "",
-    codigo: "",
     pilotoNombre: "",
     parqueNombre: "",
     equipoRPA: "",
@@ -46,7 +43,6 @@ export function ChecklistForm() {
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
-  const [disp, setDisp] = useState<{ usados: string[]; siguiente: string } | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
 
   const metodos = useForm<InspeccionInput>({
@@ -55,43 +51,9 @@ export function ChecklistForm() {
     mode: "onTouched",
   });
 
-  const { control, handleSubmit, trigger, register, setValue, getValues, formState } =
+  const { control, handleSubmit, trigger, register, setValue, formState } =
     metodos;
   const respuestas = useWatch({ control, name: "respuestas" });
-  const revision = useWatch({ control, name: "revision" });
-  const codigo = useWatch({ control, name: "codigo" });
-
-  // Consulta los códigos disponibles para la revisión ingresada (debounced).
-  useEffect(() => {
-    const rev = (revision ?? "").trim();
-    if (!/^\d{1,3}$/.test(rev)) {
-      setDisp(null);
-      return;
-    }
-    const ctrl = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/disponibilidad?revision=${rev}`, {
-          signal: ctrl.signal,
-        });
-        const json = await res.json();
-        setDisp(json);
-        // Pre-rellena el código con el siguiente disponible si está vacío.
-        if (!(getValues("codigo") ?? "").trim()) {
-          setValue("codigo", json.siguiente);
-        }
-      } catch {
-        /* ignore */
-      }
-    }, 350);
-    return () => {
-      clearTimeout(t);
-      ctrl.abort();
-    };
-  }, [revision, getValues, setValue]);
-
-  const codigoNorm = normalizarNumero(codigo ?? "");
-  const codigoTomado = Boolean(disp && codigoNorm && disp.usados.includes(codigoNorm));
 
   const { respondidos, sies, noes, nas, itemsNo } = useMemo(() => {
     let sies = 0,
@@ -113,28 +75,11 @@ export function ChecklistForm() {
   const irAChecklist = async () => {
     const ok = await trigger([
       "fechaInspeccion",
-      "revision",
-      "codigo",
       "pilotoNombre",
       "parqueNombre",
       "equipoRPA",
     ]);
     if (!ok) return;
-
-    // Verificación de disponibilidad EN EL MOMENTO (no depende del estado con debounce).
-    const rev = normalizarNumero(getValues("revision"));
-    const cod = normalizarNumero(getValues("codigo"));
-    try {
-      const res = await fetch(`/api/disponibilidad?revision=${rev}`);
-      const data = await res.json();
-      setDisp(data); // refresca el estado → el aviso inline se actualiza
-      if (Array.isArray(data.usados) && data.usados.includes(cod)) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return; // código no disponible → no permite comenzar
-      }
-    } catch {
-      /* si la verificación falla, el servidor igual rechaza con 409 al enviar */
-    }
 
     setPaso(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -161,13 +106,6 @@ export function ChecklistForm() {
         body: JSON.stringify(data),
       });
       const json = await res.json();
-      if (res.status === 409 && json?.codigoNoDisponible) {
-        setEnviando(false);
-        setPaso(0);
-        setErrorEnvio(json.error);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
       if (!res.ok && res.status !== 207) {
         throw new Error(json?.error ?? "No se pudo enviar la inspección.");
       }
@@ -252,64 +190,6 @@ export function ChecklistForm() {
                   className="campo"
                 />
               </Campo>
-              <div className="grid grid-cols-2 gap-4">
-                <Campo
-                  label="Revisión"
-                  error={formState.errors.revision?.message}
-                >
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={3}
-                    {...register("revision", {
-                      onChange: (e) =>
-                        setValue(
-                          "revision",
-                          e.target.value.replace(/\D/g, "").slice(0, 3),
-                        ),
-                    })}
-                    className="campo"
-                    placeholder="Ej: 03"
-                  />
-                </Campo>
-                <Campo
-                  label="Código OPE-PR-"
-                  error={
-                    formState.errors.codigo?.message ??
-                    (codigoTomado
-                      ? `OPE-PR-${codigoNorm} ya usado en la revisión ${normalizarNumero(
-                          revision ?? "",
-                        )}. Disponible: OPE-PR-${disp?.siguiente}`
-                      : undefined)
-                  }
-                >
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={3}
-                    {...register("codigo", {
-                      onChange: (e) =>
-                        setValue(
-                          "codigo",
-                          e.target.value.replace(/\D/g, "").slice(0, 3),
-                        ),
-                    })}
-                    className="campo"
-                    placeholder="Ej: 04"
-                  />
-                </Campo>
-              </div>
-              {disp && !codigoTomado && (
-                <p className="-mt-2 text-xs text-iner-gray">
-                  {disp.usados.length > 0
-                    ? `Códigos usados en la revisión ${normalizarNumero(revision ?? "")}: ${disp.usados
-                        .map((c) => `OPE-PR-${c}`)
-                        .join(", ")}. `
-                    : ""}
-                  Disponible:{" "}
-                  <strong className="text-iner-green">OPE-PR-{disp.siguiente}</strong>
-                </p>
-              )}
               <Campo
                 label="Nombre del piloto"
                 error={formState.errors.pilotoNombre?.message}
@@ -348,17 +228,10 @@ export function ChecklistForm() {
             <button
               type="button"
               onClick={irAChecklist}
-              disabled={codigoTomado}
               className="btn-primary mt-5 w-full"
             >
               Comenzar checklist
             </button>
-            {codigoTomado && (
-              <p className="mt-2 text-center text-xs font-medium text-red-600">
-                El código OPE-PR-{codigoNorm} no está disponible para la revisión{" "}
-                {normalizarNumero(revision ?? "")}. Usa OPE-PR-{disp?.siguiente}.
-              </p>
-            )}
           </section>
         )}
 

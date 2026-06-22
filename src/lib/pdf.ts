@@ -7,8 +7,6 @@ import {
 } from "./inspeccion";
 
 interface DatosPdf {
-  codigo: string;
-  revision: string;
   pilotoNombre: string;
   parqueNombre: string;
   equipoRPA: string;
@@ -56,7 +54,7 @@ function construirCuerpo(filas: FilaResultado[]): string {
             const obs = f?.observacion ?? "";
             const obsTexto = valor === "NA" && !obs ? "N/A" : obs;
             return `<tr>
-              <td class="item">${esc(item.texto)}</td>
+              <td class="item${item.critico ? " crit" : ""}">${esc(item.texto)}</td>
               <td class="ck">${marca(valor, "SI")}</td>
               <td class="ck">${marca(valor, "NO")}</td>
               <td class="obs">${esc(obsTexto)}</td>
@@ -84,8 +82,8 @@ function construirCuerpo(filas: FilaResultado[]): string {
 }
 
 // Encabezado del documento — se repite en cada página (display: table-header-group).
-// Código, revisión y fecha los define el piloto (la fecha es la de la inspección).
-const headerDoc = (meta: { codigo: string; revision: string; fechaTexto: string }) => `
+// La fecha la define el piloto (es la fecha de la inspección).
+const headerDoc = (meta: { fechaTexto: string }) => `
 <div class="doc-header">
   <table class="hmain">
     <tr>
@@ -93,8 +91,6 @@ const headerDoc = (meta: { codigo: string; revision: string; fechaTexto: string 
       <td class="htitle">Procedimiento trabajo aéreo</td>
       <td class="hmeta">
         <table class="hmeta-t">
-          <tr><td>Código</td><td>OPE-PR-${esc(meta.codigo)}</td></tr>
-          <tr><td colspan="2">Revisión ${esc(meta.revision)}</td></tr>
           <tr><td>Fecha</td><td><b>${esc(meta.fechaTexto)}</b></td></tr>
         </table>
       </td>
@@ -110,13 +106,12 @@ const headerDoc = (meta: { codigo: string; revision: string; fechaTexto: string 
 // Pie del documento — se repite en cada página (display: table-footer-group).
 const footerDoc = `
 <div class="doc-footer">
-  <table class="fmain">
-    <tr><td class="fcell">
-      <b>Autorizado por:</b> Nicolas Caballero Arcos<br/>
-      <b>Cargo:</b> Administrador de Contrato<br/>
-      <b>Firma:</b> <img src="${FIRMA_DATA_URI}" alt="firma"/>
-    </td></tr>
-  </table>
+  <img class="ffirma" src="${FIRMA_DATA_URI}" alt="firma"/>
+  <div class="fauth">
+    <b>Autorizado por:</b> Nicolas Caballero Arcos<br/>
+    <b>Cargo:</b> Administrador de Contrato<br/>
+    <b>Firma:</b>
+  </div>
 </div>`;
 
 function construirHtml(datos: DatosPdf): string {
@@ -125,7 +120,7 @@ function construirHtml(datos: DatosPdf): string {
 <style>
   @page { size: A4; margin: 8mm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 9.5px; margin: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11px; margin: 0; }
 
   /* Estructura de página: thead/tfoot se repiten en cada hoja */
   table.page { width: 100%; border-collapse: collapse; }
@@ -138,24 +133,35 @@ function construirHtml(datos: DatosPdf): string {
   .doc-footer { padding-top: 6px; }
 
   /* Encabezado */
-  table.hmain { width: 100%; border-collapse: collapse; }
+  table.hmain { width: 100%; border-collapse: collapse; table-layout: fixed; }
   table.hmain > tr > td, .hmain td { border: 1px solid #000; }
-  .hlogo { width: 168px; text-align: center; padding: 5px; vertical-align: middle; }
-  .hlogo img { height: 66px; }
-  .htitle { text-align: center; font-weight: bold; font-size: 17px; vertical-align: middle; }
-  .hmeta { width: 185px; padding: 0; vertical-align: top; }
-  .hmeta-t { width: 100%; border-collapse: collapse; font-size: 9px; }
-  .hmeta-t td { border: 1px solid #000; padding: 2px 6px; }
-  .hsig { font-size: 8px; padding: 4px 6px; vertical-align: top; width: 33.33%; }
+  .hlogo { width: 24%; text-align: center; padding: 3px; vertical-align: middle; }
+  .hlogo img { height: 84px; max-width: 100%; }
+  .htitle { width: 50%; text-align: center; font-weight: bold; font-size: 19px;
+            white-space: nowrap; vertical-align: middle; }
+  .hmeta { width: 26%; padding: 0; vertical-align: middle; }
+  /* La tabla interna llena la celda; el borde exterior lo da la celda hmeta,
+     así se evita el doble borde. Solo se conserva el divisor Fecha | valor. */
+  .hmeta-t { width: 100%; height: 100%; border-collapse: collapse; font-size: 12px; }
+  /* border: none anula la regla .hmain td (que da borde a TODO td descendiente)
+     y evita el doble borde dentro de la caja Fecha. */
+  .hmeta-t td { border: none; padding: 4px 6px; }
+  /* Etiqueta "Fecha" tan angosta como su texto, para que la fecha tenga más ancho. */
+  .hmeta-t td:first-child { width: 1%; white-space: nowrap; border-right: 1px solid #000; }
+  .hsig { font-size: 10.5px; padding: 5px 7px; vertical-align: top; width: 33.33%; }
 
-  /* Pie */
-  table.fmain { width: 100%; border-collapse: collapse; }
-  .fcell { border: 1px solid #000; padding: 4px 8px; font-size: 8.5px; line-height: 1.5; }
-  .fcell img { height: 34px; vertical-align: middle; }
+  /* Pie — sin bordes, como el original: la firma se superpone al texto.
+     mix-blend-mode: multiply elimina el fondo blanco del JPEG y deja ver
+     los trazos azules por encima de "Autorizado/Cargo/Firma". */
+  .doc-footer { position: relative; padding-top: 6px; font-size: 9.5px;
+                line-height: 1.5; min-height: 80px; }
+  .fauth { position: relative; z-index: 0; }
+  .ffirma { position: absolute; left: 6px; top: 6px; height: 72px; z-index: 1;
+            mix-blend-mode: multiply; }
 
   /* Título y cabecera de datos */
-  h2.tit { font-size: 12px; font-weight: bold; margin: 4px 0 6px; }
-  table.cab { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 9.5px; }
+  h2.tit { font-size: 14px; font-weight: bold; margin: 4px 0 6px; text-align: center; }
+  table.cab { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 11px; }
   table.cab td { border: 1px solid #000; padding: 4px 7px; }
   table.cab .k { background: ${C.cream}; font-weight: bold; width: 15%; }
 
@@ -165,28 +171,27 @@ function construirHtml(datos: DatosPdf): string {
   table.chk td { border: 1px solid #000; padding: 3px 6px; vertical-align: middle;
                  word-wrap: break-word; }
   col.c-num { width: 6%; }
-  col.c-item { width: 56%; }
-  col.c-ck { width: 7%; }
+  col.c-item { width: 62%; }
+  col.c-ck { width: 5%; }
   col.c-obs { width: 22%; }
 
-  .titulo { text-align: center; font-weight: bold; background: #fff; }
-  .proc { text-align: center; font-weight: bold; background: ${C.cream};
+  .proc { text-align: center; font-weight: bold; background: #fff;
           text-transform: uppercase; letter-spacing: .5px; }
   .etapa { text-align: center; font-weight: bold; background: ${C.peach};
            text-transform: uppercase; }
   .num { text-align: center; font-weight: bold; background: ${C.cream}; }
   .sub { font-weight: bold; background: ${C.blue}; text-transform: uppercase; }
-  .hdr { text-align: center; font-weight: bold; background: ${C.blue}; }
-  .hdr.si { background: ${C.yellow}; }
+  /* Cabecera SI / No / Observación.: las tres celdas en amarillo, como el original. */
+  .hdr { text-align: center; font-weight: bold; background: ${C.yellow}; }
   .hdr.obs { text-align: left; }
-  .ck { text-align: center; font-weight: bold; font-size: 12px; }
-  .obs { font-size: 9px; }
+  .ck { text-align: center; font-weight: bold; font-size: 13px; }
+  .obs { font-size: 10.5px; }
+  /* Ítems críticos (como el original): celda del texto en rojo con texto negro en negrita. */
+  .item.crit { background: #FF0000; color: #000; font-weight: bold; }
 </style></head>
 <body>
   <table class="page">
     <thead><tr><td>${headerDoc({
-      codigo: datos.codigo,
-      revision: datos.revision,
       fechaTexto: formatearFechaSolo(datos.fecha),
     })}</td></tr></thead>
     <tfoot><tr><td>${footerDoc}</td></tr></tfoot>
@@ -201,7 +206,6 @@ function construirHtml(datos: DatosPdf): string {
           <col class="c-num"/><col class="c-item"/><col class="c-ck"/><col class="c-ck"/><col class="c-obs"/>
         </colgroup>
         <tbody>
-          <tr><td class="titulo" colspan="5">FORMATO CHECK LIST</td></tr>
           <tr><td class="proc" colspan="5">PROCEDIMIENTOS NORMALES</td></tr>
           ${construirCuerpo(datos.filas)}
         </tbody>
