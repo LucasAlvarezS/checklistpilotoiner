@@ -45,8 +45,8 @@ function construirCuerpo(filas: FilaResultado[]): string {
   let primeraSub = true;
 
   return CHECKLIST.map((etapa) => {
-    const subs = etapa.subsecciones
-      .map((sub) => {
+    return etapa.subsecciones
+      .map((sub, idx) => {
         const filasItems = sub.items
           .map((item) => {
             const f = mapa.get(item.id);
@@ -70,14 +70,22 @@ function construirCuerpo(filas: FilaResultado[]): string {
           : `<td class="sub" colspan="4">${esc(sub.titulo)}</td>`;
         primeraSub = false;
 
-        return `<tr>
+        const filaSub = `<tr>
             <td class="num" rowspan="${sub.items.length + 1}">${esc(sub.numero)}</td>
             ${cabezaSub}
           </tr>${filasItems}`;
+
+        // La banda de etapa va unida a su primera subsección, para que ni la
+        // banda ni el encabezado de subsección queden huérfanos al final de
+        // página. Cada subsección es un grupo con break-inside: avoid.
+        const bandaEtapa =
+          idx === 0
+            ? `<tr><td class="etapa" colspan="5">${esc(etapa.titulo)}</td></tr>`
+            : "";
+
+        return `<tbody class="grp">${bandaEtapa}${filaSub}</tbody>`;
       })
       .join("");
-
-    return `<tr><td class="etapa" colspan="5">${esc(etapa.titulo)}</td></tr>${subs}`;
   }).join("");
 }
 
@@ -170,6 +178,10 @@ function construirHtml(datos: DatosPdf): string {
               border: 1px solid #000; }
   table.chk td { border: 1px solid #000; padding: 3px 6px; vertical-align: middle;
                  word-wrap: break-word; }
+  /* Cada subsección (con su banda de etapa) es un grupo que no se parte entre
+     páginas: evita encabezados huérfanos al final de una hoja. */
+  table.chk tbody.grp { break-inside: avoid; }
+  table.chk tr { break-inside: avoid; }
   col.c-num { width: 6%; }
   col.c-item { width: 62%; }
   col.c-ck { width: 5%; }
@@ -205,10 +217,10 @@ function construirHtml(datos: DatosPdf): string {
         <colgroup>
           <col class="c-num"/><col class="c-item"/><col class="c-ck"/><col class="c-ck"/><col class="c-obs"/>
         </colgroup>
-        <tbody>
+        <tbody class="grp">
           <tr><td class="proc" colspan="5">PROCEDIMIENTOS NORMALES</td></tr>
-          ${construirCuerpo(datos.filas)}
         </tbody>
+        ${construirCuerpo(datos.filas)}
       </table>
     </td></tr></tbody>
   </table>
