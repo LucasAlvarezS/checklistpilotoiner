@@ -5,9 +5,10 @@ import { IconAlert, IconCheck, IconMail } from "../components/icons";
 export default async function EnviadoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; correo?: string }>;
+  searchParams: Promise<{ estado?: string; correo?: string; pendiente?: string }>;
 }) {
-  const { estado, correo } = await searchParams;
+  const { estado, correo, pendiente } = await searchParams;
+  const esPendiente = pendiente === "1";
   const conObservaciones = estado === "CON_OBSERVACIONES";
   const correoEnviado = correo !== "0";
 
@@ -25,35 +26,58 @@ export default async function EnviadoPage({
 
         <div
           className={`mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-full ${
-            conObservaciones
+            esPendiente || conObservaciones
               ? "bg-iner-amber-50 text-iner-amber"
               : "bg-iner-green-50 text-iner-green"
           }`}
         >
-          {conObservaciones ? <IconAlert size={32} /> : <IconCheck size={32} />}
+          {esPendiente || conObservaciones ? (
+            <IconAlert size={32} />
+          ) : (
+            <IconCheck size={32} />
+          )}
         </div>
 
-        <h1 className="mt-4 text-xl font-bold text-iner-green">
-          Inspección enviada
-        </h1>
-        <p className="mt-2 text-sm text-iner-gray">
-          {conObservaciones
-            ? "La inspección se registró con observaciones. Se notificó al supervisor con el detalle de los ítems en NO."
-            : "La inspección se registró conforme, con todas las casillas en SÍ."}
-        </p>
+        {esPendiente ? (
+          <>
+            <h1 className="mt-4 text-xl font-bold text-iner-green">
+              Inspección guardada
+            </h1>
+            <p className="mt-2 text-sm text-iner-gray">
+              No hay conexión en este momento. La inspección quedó guardada en este
+              dispositivo y se enviará automáticamente cuando vuelva el internet.
+            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-iner-amber-50 px-4 py-2 text-sm font-medium text-[#9a6200]">
+              <IconAlert size={16} />
+              Pendiente de envío. Mantén la app instalada y abre el checklist cuando
+              tengas señal.
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 className="mt-4 text-xl font-bold text-iner-green">
+              Inspección enviada
+            </h1>
+            <p className="mt-2 text-sm text-iner-gray">
+              {conObservaciones
+                ? "La inspección se registró con observaciones. Se notificó al supervisor con el detalle de los ítems en NO."
+                : "La inspección se registró conforme, con todas las casillas en SÍ."}
+            </p>
 
-        <div
-          className={`mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
-            correoEnviado
-              ? "bg-iner-green-50 text-iner-green"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {correoEnviado && <IconMail size={16} />}
-          {correoEnviado
-            ? "Correo enviado al supervisor con el PDF adjunto."
-            : "La inspección se guardó, pero el correo no pudo enviarse. Avisa al administrador."}
-        </div>
+            <div
+              className={`mt-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium ${
+                correoEnviado
+                  ? "bg-iner-green-50 text-iner-green"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {correoEnviado && <IconMail size={16} />}
+              {correoEnviado
+                ? "Correo enviado al supervisor con el PDF adjunto."
+                : "La inspección se guardó, pero el correo no pudo enviarse. Avisa al administrador."}
+            </div>
+          </>
+        )}
 
         <Link href="/" className="btn-primary mt-6 inline-block w-full">
           Nueva inspección

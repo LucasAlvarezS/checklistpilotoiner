@@ -1,21 +1,32 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  CHECKLIST,
+  ETAPAS_PREVUELO_LISTA,
+  ETAPAS_POSTVUELO_LISTA,
   ITEMS_PLANOS,
-  TOTAL_ITEMS,
+  ITEMS_PREVUELO,
+  ITEMS_POSTVUELO,
+  type Etapa,
+  type ItemPlano,
   type Valor,
 } from "@/lib/checklist-schema";
 import { inspeccionSchema, type InspeccionInput } from "@/lib/validation";
+import { itemsValidos } from "@/lib/inspeccion";
+import {
+  enviarInspeccion,
+  guardarBorrador,
+  leerBorrador,
+  limpiarBorrador,
+} from "@/lib/offline";
 import { ItemRow } from "./ItemRow";
 import { IconCheck } from "./icons";
 
-const PASOS = ["Datos", "Checklist", "Enviar"] as const;
+const PASOS = ["Datos", "Pre-vuelo", "Post-vuelo", "Enviar"] as const;
 
 function hoyLocal(): string {
   const d = new Date();
@@ -38,11 +49,42 @@ function valoresIniciales(): InspeccionInput {
   };
 }
 
+interface Conteo {
+  respondidos: number;
+  sies: number;
+  noes: number;
+  nas: number;
+  itemsNo: { seccion: string; numero: string; texto: string }[];
+  total: number;
+}
+
+function contar(
+  respuestas: InspeccionInput["respuestas"] | undefined,
+  items: ItemPlano[],
+): Conteo {
+  let sies = 0,
+    noes = 0,
+    nas = 0;
+  const itemsNo: Conteo["itemsNo"] = [];
+  for (const it of items) {
+    const v = respuestas?.[it.id]?.valor;
+    if (v === "SI") sies++;
+    else if (v === "NA") nas++;
+    else if (v === "NO") {
+      noes++;
+      itemsNo.push({ seccion: it.seccion, numero: it.numero, texto: it.texto });
+    }
+  }
+  return { respondidos: sies + noes + nas, sies, noes, nas, itemsNo, total: items.length };
+}
+
 export function ChecklistForm() {
   const router = useRouter();
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [listoParaVolar, setListoParaVolar] = useState(false);
+  const [pendiente, setPendiente] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
 
   const metodos = useForm<InspeccionInput>({
@@ -51,28 +93,42 @@ export function ChecklistForm() {
     mode: "onTouched",
   });
 
-  const { control, handleSubmit, trigger, register, setValue, formState } =
+  const { control, handleSubmit, trigger, register, setValue, getValues, reset, formState } =
     metodos;
-  const respuestas = useWatch({ control, name: "respuestas" });
 
-  const { respondidos, sies, noes, nas, itemsNo } = useMemo(() => {
-    let sies = 0,
-      noes = 0,
-      nas = 0;
-    const itemsNo: { seccion: string; numero: string; texto: string }[] = [];
-    for (const it of ITEMS_PLANOS) {
-      const v = respuestas?.[it.id]?.valor;
-      if (v === "SI") sies++;
-      else if (v === "NA") nas++;
-      else if (v === "NO") {
-        noes++;
-        itemsNo.push({ seccion: it.seccion, numero: it.numero, texto: it.texto });
-      }
+  // Autoguardado: solo después de restaurar el borrador, para no pisarlo.
+  const restaurado = useRef(false);
+  useEffect(() => {
+    const b = leerBorrador();
+    if (b?.values) {
+      reset(b.values);
+      setPaso(typeof b.paso === "number" ? b.paso : 0);
+      setListoParaVolar(Boolean(b.listoParaVolar));
     }
-    return { respondidos: sies + noes + nas, sies, noes, nas, itemsNo };
-  }, [respuestas]);
+    restaurado.current = true;
+  }, [reset]);
 
-  const irAChecklist = async () => {
+  const valores = useWatch({ control });
+  const respuestas = valores?.respuestas as InspeccionInput["respuestas"] | undefined;
+
+  useEffect(() => {
+    if (!restaurado.current) return;
+    const t = setTimeout(() => {
+      guardarBorrador({ values: getValues(), paso, listoParaVolar });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [valores, paso, listoParaVolar, getValues]);
+
+  const resumenPre = useMemo(() => contar(respuestas, ITEMS_PREVUELO), [respuestas]);
+  const resumenPost = useMemo(() => contar(respuestas, ITEMS_POSTVUELO), [respuestas]);
+  const resumenTotal = useMemo(() => contar(respuestas, ITEMS_PLANOS), [respuestas]);
+
+  const preVueloOk = useMemo(
+    () => itemsValidos(respuestas, ITEMS_PREVUELO),
+    [respuestas],
+  );
+
+  const irAPrevuelo = async () => {
     const ok = await trigger([
       "fechaInspeccion",
       "pilotoNombre",
@@ -80,15 +136,20 @@ export function ChecklistForm() {
       "equipoRPA",
     ]);
     if (!ok) return;
-
     setPaso(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Marca todos los ítems en SÍ y baja hasta el final del checklist (sin salir del paso,
-  // para que el piloto pueda seguir editando cualquier ítem si lo necesita).
-  const marcarTodoSi = () => {
-    for (const it of ITEMS_PLANOS) {
+  const confirmarListoParaVolar = () => {
+    if (!preVueloOk) return;
+    setListoParaVolar(true);
+    setPaso(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Marca en SÍ los ítems de una fase (sin salir del paso, para poder ajustar).
+  const marcarTodoSi = (items: ItemPlano[]) => {
+    for (const it of items) {
       setValue(`respuestas.${it.id}.valor`, "SI", { shouldDirty: true });
     }
     setTimeout(() => {
@@ -99,38 +160,51 @@ export function ChecklistForm() {
   const onValid = async (data: InspeccionInput) => {
     setEnviando(true);
     setErrorEnvio(null);
-    try {
-      const res = await fetch("/api/inspecciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json = await res.json();
-      if (!res.ok && res.status !== 207) {
-        throw new Error(json?.error ?? "No se pudo enviar la inspección.");
-      }
+    const r = await enviarInspeccion(data);
+    if (r.pendiente) {
+      // Sin conexión: se encoló. Mostramos confirmación inline (sin navegar a una
+      // ruta del servidor, que no cargaría offline). Se enviará al recuperar la red.
+      limpiarBorrador();
+      setPendiente(true);
+      setEnviando(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (r.ok) {
+      limpiarBorrador();
       const params = new URLSearchParams({
-        estado: json.estado ?? (noes > 0 ? "CON_OBSERVACIONES" : "COMPLETA_SI"),
-        correo: json.correoEnviado ? "1" : "0",
+        estado: r.estado ?? (resumenTotal.noes > 0 ? "CON_OBSERVACIONES" : "COMPLETA_SI"),
+        correo: r.correo === false ? "0" : "1",
       });
       router.push(`/enviado?${params.toString()}`);
-    } catch (e) {
-      setErrorEnvio(
-        e instanceof Error ? e.message : "Ocurrió un error al enviar.",
-      );
-      setEnviando(false);
+      return;
     }
+    setErrorEnvio("No se pudo enviar la inspección. Inténtalo nuevamente.");
+    setEnviando(false);
+  };
+
+  const nuevaInspeccion = () => {
+    reset(valoresIniciales());
+    setListoParaVolar(false);
+    setPendiente(false);
+    setPaso(0);
+    limpiarBorrador();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const onInvalid = () => {
-    setPaso(1);
+    // Llevar al piloto a la fase donde están los ítems pendientes.
+    const preOk = itemsValidos(getValues("respuestas"), ITEMS_PREVUELO);
+    setPaso(preOk ? 2 : 1);
     setErrorEnvio(
       "Hay ítems sin responder o sin observación. Revisa los campos marcados.",
     );
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const pct = Math.round((respondidos / TOTAL_ITEMS) * 100);
+  // Conteo de la fase actual para la barra de progreso.
+  const fase = paso === 1 ? resumenPre : resumenPost;
+  const pct = fase.total ? Math.round((fase.respondidos / fase.total) * 100) : 0;
 
   return (
     <FormProvider {...metodos}>
@@ -146,12 +220,39 @@ export function ChecklistForm() {
           </div>
         </header>
 
+        {pendiente && (
+          <section className="rounded-xl border border-iner-amber/40 bg-white p-6 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-iner-amber-50 text-iner-amber">
+              <IconCheck size={32} />
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-iner-green">
+              Inspección guardada
+            </h2>
+            <p className="mt-2 text-sm text-iner-gray">
+              No hay conexión en este momento. La inspección quedó guardada en este
+              dispositivo y se enviará automáticamente cuando vuelva el internet.
+            </p>
+            <div className="mt-4 rounded-lg bg-iner-amber-50 px-4 py-2 text-sm font-medium text-[#9a6200]">
+              Pendiente de envío. Mantén la app instalada y ábrela cuando tengas señal.
+            </div>
+            <button
+              type="button"
+              onClick={nuevaInspeccion}
+              className="btn-primary mt-6 w-full"
+            >
+              Nueva inspección
+            </button>
+          </section>
+        )}
+
+        {!pendiente && (
+        <>
         {/* Pasos */}
         <ol className="mb-6 flex items-center gap-2 text-xs font-semibold">
           {PASOS.map((p, i) => (
             <li key={p} className="flex flex-1 items-center gap-2">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
                   i <= paso ? "bg-iner-green text-white" : "bg-black/10 text-iner-gray"
                 }`}
               >
@@ -227,7 +328,7 @@ export function ChecklistForm() {
             </div>
             <button
               type="button"
-              onClick={irAChecklist}
+              onClick={irAPrevuelo}
               className="btn-primary mt-5 w-full"
             >
               Comenzar checklist
@@ -235,50 +336,94 @@ export function ChecklistForm() {
           </section>
         )}
 
-        {/* PASO 2 — Checklist */}
+        {/* PASO 2 — Pre-vuelo (hasta el punto de volar) */}
         {paso === 1 && (
           <section className="space-y-4">
             <div className="rounded-xl border border-iner-green/30 bg-iner-green-50 p-4">
+              <p className="mb-2 text-sm font-bold uppercase tracking-wide text-iner-green">
+                Inspección pre-vuelo
+              </p>
               <button
                 type="button"
-                onClick={marcarTodoSi}
+                onClick={() => marcarTodoSi(ITEMS_PREVUELO)}
                 className="btn-primary inline-flex w-full items-center justify-center gap-2"
               >
                 <IconCheck size={18} />
                 Marcar todo en SÍ
               </button>
               <p className="mt-2 text-center text-xs text-iner-gray">
-                Marca todos los ítems en SÍ. Puedes seguir revisando y ajustar cualquier
-                ítem antes de continuar.
+                Completa las etapas previas al vuelo. Cuando todo esté en SÍ/N/A (o NO
+                con observación) podrás confirmar <strong>Listo para volar</strong>.
               </p>
             </div>
-            {CHECKLIST.map((etapa) => (
-              <div
-                key={etapa.id}
-                className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
-              >
-                <div className="bg-iner-green px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-white">
-                  {etapa.titulo}
+
+            <ListaEtapas etapas={ETAPAS_PREVUELO_LISTA} />
+
+            <div ref={finRef} className="space-y-3">
+              {preVueloOk ? (
+                <div className="flex items-center gap-2 rounded-lg border border-iner-green/30 bg-iner-green-50 p-3 text-sm font-semibold text-iner-green">
+                  <IconCheck size={18} />
+                  Pre-vuelo completo. La aeronave está lista para volar.
                 </div>
-                <div className="px-4">
-                  {etapa.subsecciones.map((sub) => (
-                    <div key={`${etapa.id}-${sub.numero}-${sub.titulo}`} className="py-2">
-                      <h3 className="border-b border-black/10 py-2 text-sm font-bold text-iner-green">
-                        <span className="mr-1 text-iner-gray">{sub.numero}.</span>
-                        {sub.titulo}
-                      </h3>
-                      {sub.items.map((item) => (
-                        <ItemRow key={item.id} item={item} />
-                      ))}
-                    </div>
-                  ))}
-                </div>
+              ) : (
+                <p className="text-center text-xs text-iner-gray">
+                  Responde los {resumenPre.total} ítems pre-vuelo (los NO requieren
+                  observación) para habilitar el botón.
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaso(0)}
+                  className="btn-secondary flex-1"
+                >
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarListoParaVolar}
+                  disabled={!preVueloOk}
+                  className="btn-primary flex-1"
+                >
+                  Listo para volar
+                </button>
               </div>
-            ))}
+            </div>
+          </section>
+        )}
+
+        {/* PASO 3 — Post-vuelo */}
+        {paso === 2 && (
+          <section className="space-y-4">
+            {listoParaVolar && (
+              <div className="flex items-center gap-2 rounded-lg border border-iner-green/30 bg-iner-green-50 p-3 text-sm font-semibold text-iner-green">
+                <IconCheck size={18} />
+                Listo para volar confirmado. Completa el checklist tras la operación.
+              </div>
+            )}
+            <div className="rounded-xl border border-iner-green/30 bg-iner-green-50 p-4">
+              <p className="mb-2 text-sm font-bold uppercase tracking-wide text-iner-green">
+                Inspección post-vuelo
+              </p>
+              <button
+                type="button"
+                onClick={() => marcarTodoSi(ITEMS_POSTVUELO)}
+                className="btn-primary inline-flex w-full items-center justify-center gap-2"
+              >
+                <IconCheck size={18} />
+                Marcar todo en SÍ
+              </button>
+              <p className="mt-2 text-center text-xs text-iner-gray">
+                Completa las etapas de vuelo, aterrizaje y almacenaje.
+              </p>
+            </div>
+
+            <ListaEtapas etapas={ETAPAS_POSTVUELO_LISTA} />
+
             <div ref={finRef} className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setPaso(0)}
+                onClick={() => setPaso(1)}
                 className="btn-secondary flex-1"
               >
                 Volver
@@ -286,7 +431,7 @@ export function ChecklistForm() {
               <button
                 type="button"
                 onClick={() => {
-                  setPaso(2);
+                  setPaso(3);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 className="btn-primary flex-1"
@@ -297,28 +442,29 @@ export function ChecklistForm() {
           </section>
         )}
 
-        {/* PASO 3 — Resumen + enviar */}
-        {paso === 2 && (
+        {/* PASO 4 — Resumen + enviar */}
+        {paso === 3 && (
           <section className="rounded-xl border border-black/10 bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-iner-green">
               Resumen
             </h2>
             <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-              <Contador n={sies} label="SÍ" clase="text-iner-green" />
-              <Contador n={noes} label="NO" clase="text-iner-amber" />
-              <Contador n={nas} label="N/A" clase="text-iner-gray" />
+              <Contador n={resumenTotal.sies} label="SÍ" clase="text-iner-green" />
+              <Contador n={resumenTotal.noes} label="NO" clase="text-iner-amber" />
+              <Contador n={resumenTotal.nas} label="N/A" clase="text-iner-gray" />
             </div>
             <p className="mb-4 text-sm text-iner-gray">
-              Respondidos <strong>{respondidos}</strong> de {TOTAL_ITEMS} ítems.
+              Respondidos <strong>{resumenTotal.respondidos}</strong> de{" "}
+              {resumenTotal.total} ítems.
             </p>
 
-            {noes > 0 ? (
+            {resumenTotal.noes > 0 ? (
               <div className="mb-4 rounded-lg border border-iner-amber/50 bg-iner-amber-50 p-3">
                 <p className="mb-2 text-sm font-bold text-[#9a6200]">
                   Ítems marcados en NO
                 </p>
                 <ul className="space-y-1 text-sm text-foreground">
-                  {itemsNo.map((it, i) => (
+                  {resumenTotal.itemsNo.map((it, i) => (
                     <li key={i}>
                       <span className="text-iner-gray">{it.numero}. {it.seccion}:</span>{" "}
                       {it.texto}
@@ -327,7 +473,7 @@ export function ChecklistForm() {
                 </ul>
               </div>
             ) : (
-              respondidos === TOTAL_ITEMS && (
+              resumenTotal.respondidos === resumenTotal.total && (
                 <div className="mb-4 flex items-center gap-2 rounded-lg border border-iner-green/30 bg-iner-green-50 p-3 text-sm font-semibold text-iner-green">
                   <IconCheck size={18} />
                   Todas las casillas marcadas, sin observaciones.
@@ -338,7 +484,7 @@ export function ChecklistForm() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setPaso(1)}
+                onClick={() => setPaso(2)}
                 className="btn-secondary flex-1"
                 disabled={enviando}
               >
@@ -356,14 +502,14 @@ export function ChecklistForm() {
           </section>
         )}
 
-        {/* Barra de progreso fija */}
-        {paso === 1 && (
+        {/* Barra de progreso fija (durante las fases de checklist) */}
+        {(paso === 1 || paso === 2) && (
           <div className="fixed inset-x-0 bottom-0 border-t border-black/10 bg-white/95 px-4 py-3 backdrop-blur">
             <div className="mx-auto max-w-3xl">
               <div className="mb-1 flex justify-between text-xs font-medium text-iner-gray">
-                <span>Progreso</span>
+                <span>{paso === 1 ? "Pre-vuelo" : "Post-vuelo"}</span>
                 <span>
-                  {respondidos}/{TOTAL_ITEMS} · {pct}%
+                  {fase.respondidos}/{fase.total} · {pct}%
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-black/10">
@@ -375,8 +521,40 @@ export function ChecklistForm() {
             </div>
           </div>
         )}
+        </>
+        )}
       </div>
     </FormProvider>
+  );
+}
+
+function ListaEtapas({ etapas }: { etapas: Etapa[] }) {
+  return (
+    <>
+      {etapas.map((etapa) => (
+        <div
+          key={etapa.id}
+          className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
+        >
+          <div className="bg-iner-green px-4 py-2.5 text-sm font-bold uppercase tracking-wide text-white">
+            {etapa.titulo}
+          </div>
+          <div className="px-4">
+            {etapa.subsecciones.map((sub) => (
+              <div key={`${etapa.id}-${sub.numero}-${sub.titulo}`} className="py-2">
+                <h3 className="border-b border-black/10 py-2 text-sm font-bold text-iner-green">
+                  <span className="mr-1 text-iner-gray">{sub.numero}.</span>
+                  {sub.titulo}
+                </h3>
+                {sub.items.map((item) => (
+                  <ItemRow key={item.id} item={item} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 

@@ -1,6 +1,24 @@
 import { ITEMS_PLANOS, type ItemPlano, type Valor } from "./checklist-schema";
 import type { InspeccionInput } from "./validation";
 
+/**
+ * Indica si un conjunto de ítems está válido: todos respondidos (SÍ/NO/NA) y todo
+ * NO con observación no vacía. Se usa para el gate "Listo para volar" (pre-vuelo)
+ * sin depender de zod. No exige observación para NA (es opcional).
+ */
+export function itemsValidos(
+  respuestas: InspeccionInput["respuestas"] | undefined,
+  items: Pick<ItemPlano, "id">[],
+): boolean {
+  if (!respuestas) return false;
+  return items.every((it) => {
+    const r = respuestas[it.id];
+    if (!r?.valor) return false;
+    if (r.valor === "NO" && !r.observacion?.trim()) return false;
+    return true;
+  });
+}
+
 export interface FilaResultado extends ItemPlano {
   valor: Valor;
   observacion: string;
@@ -33,6 +51,7 @@ export function filasDesdeRespuestas(
 ): FilaResultado[] {
   return rows.map((r) => ({
     id: "",
+    etapaId: "", // no se usa al reconstruir desde la BD (el PDF recorre el esquema)
     etapa: r.etapa,
     seccion: r.seccion,
     numero: r.numero,

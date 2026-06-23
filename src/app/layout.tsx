@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "./components/PwaRegister";
+import { OfflineSync } from "./components/OfflineSync";
 
 const montserrat = Montserrat({
   variable: "--font-sans",
@@ -40,6 +41,7 @@ export default function RootLayout({
     <html lang="es" className={`${montserrat.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <PwaRegister />
+        <OfflineSync />
         {children}
       </body>
     </html>

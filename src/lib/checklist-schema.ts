@@ -292,6 +292,7 @@ export const CHECKLIST: Etapa[] = RAW.map((etapa, ei) => ({
 /** Lista plana de todos los ítems, con su contexto de etapa/sección. */
 export interface ItemPlano {
   id: string;
+  etapaId: string;
   etapa: string;
   seccion: string;
   numero: string;
@@ -302,6 +303,7 @@ export const ITEMS_PLANOS: ItemPlano[] = CHECKLIST.flatMap((etapa) =>
   etapa.subsecciones.flatMap((sub) =>
     sub.items.map((item) => ({
       id: item.id,
+      etapaId: etapa.id,
       etapa: etapa.titulo,
       seccion: sub.titulo,
       numero: sub.numero,
@@ -311,3 +313,14 @@ export const ITEMS_PLANOS: ItemPlano[] = CHECKLIST.flatMap((etapa) =>
 );
 
 export const TOTAL_ITEMS = ITEMS_PLANOS.length;
+
+// Etapas previas al vuelo (hasta el punto de volar). Definen el corte de la fase
+// pre-vuelo y la habilitación del botón "Listo para volar".
+export const ETAPAS_PREVUELO = new Set(["preparacion", "prevuelo", "despegue"]);
+
+/** Etapas del checklist en orden, separadas por fase pre/post vuelo. */
+export const ETAPAS_PREVUELO_LISTA = CHECKLIST.filter((e) => ETAPAS_PREVUELO.has(e.id));
+export const ETAPAS_POSTVUELO_LISTA = CHECKLIST.filter((e) => !ETAPAS_PREVUELO.has(e.id));
+
+export const ITEMS_PREVUELO = ITEMS_PLANOS.filter((i) => ETAPAS_PREVUELO.has(i.etapaId));
+export const ITEMS_POSTVUELO = ITEMS_PLANOS.filter((i) => !ETAPAS_PREVUELO.has(i.etapaId));

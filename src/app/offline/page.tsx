@@ -15,8 +15,9 @@ export default function OfflinePage() {
         />
         <h1 className="mt-5 text-lg font-bold text-iner-green">Sin conexión</h1>
         <p className="mt-2 text-sm text-iner-gray">
-          No hay conexión a internet. Revisa tu señal e inténtalo nuevamente. El envío
-          del checklist requiere conexión.
+          Esta página aún no está cacheada. El checklist sí funciona sin conexión una
+          vez abierto: puedes completarlo y el envío quedará en cola para mandarse
+          automáticamente cuando vuelva el internet.
         </p>
       </div>
     </main>
