@@ -11,6 +11,7 @@ const DOMINIO = "@iner.cl";
 const CORREOS_PERMITIDOS = new Set(
   [
     "nicolascaballeroarcos@gmail.com",
+    "lucas.alvarezsoto@gmail.com",
     ...(process.env.CORREOS_PERMITIDOS ?? "").split(","),
   ]
     .map((c) => c.trim().toLowerCase())
