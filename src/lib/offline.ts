@@ -130,6 +130,9 @@ export async function enviarInspeccion(
       throw new Error(`HTTP ${res.status}`);
     }
     const json = await res.json().catch(() => ({}));
+    // Hay conexión confirmada: aprovecha para drenar inspecciones pendientes
+    // anteriores (no espera el resultado).
+    void flushCola();
     return {
       ok: true,
       estado: json.estado,
