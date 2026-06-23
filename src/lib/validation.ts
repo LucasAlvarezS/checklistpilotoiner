@@ -20,6 +20,9 @@ export const inspeccionSchema = z
     fechaInspeccion: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de la inspección"),
+    // Clave de idempotencia generada en el cliente (opcional). Evita duplicados al
+    // reenviar desde la cola offline.
+    clientId: z.string().trim().max(64).optional(),
     pilotoNombre: z.string().trim().min(1, "Ingresa el nombre del piloto"),
     parqueNombre: z.string().trim().min(1, "Ingresa el nombre del parque"),
     equipoRPA: z.string().trim().min(1, "Ingresa el equipo / RPA"),

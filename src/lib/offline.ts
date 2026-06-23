@@ -7,6 +7,15 @@ const KEY_COLA = "iner-checklist-cola";
 
 const hayStorage = () => typeof window !== "undefined" && !!window.localStorage;
 
+function nuevoId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+}
+
+// Inspección con clave de idempotencia para el servidor.
+type PayloadEnvio = InspeccionInput & { clientId: string };
+
 // ---------- Borrador (progreso en curso) ----------
 
 export interface Borrador {
@@ -49,7 +58,7 @@ export function limpiarBorrador(): void {
 
 interface EnCola {
   id: string;
-  payload: InspeccionInput;
+  payload: PayloadEnvio;
   creadoEn: number;
 }
 
@@ -72,16 +81,9 @@ function escribirCola(cola: EnCola[]): void {
   }
 }
 
-function encolar(payload: InspeccionInput): void {
+function encolar(payload: PayloadEnvio): void {
   const cola = leerCola();
-  cola.push({
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : String(Date.now() + Math.random()),
-    payload,
-    creadoEn: Date.now(),
-  });
+  cola.push({ id: nuevoId(), payload, creadoEn: Date.now() });
   escribirCola(cola);
 }
 
@@ -90,7 +92,7 @@ export function pendientes(): number {
   return leerCola().length;
 }
 
-async function postInspeccion(payload: InspeccionInput): Promise<Response> {
+async function postInspeccion(payload: PayloadEnvio): Promise<Response> {
   return fetch("/api/inspecciones", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -112,12 +114,14 @@ export interface ResultadoEnvio {
 export async function enviarInspeccion(
   payload: InspeccionInput,
 ): Promise<ResultadoEnvio> {
+  // clientId estable: si se encola y se reintenta, el servidor lo deduplica.
+  const conId: PayloadEnvio = { ...payload, clientId: nuevoId() };
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    encolar(payload);
+    encolar(conId);
     return { ok: false, pendiente: true };
   }
   try {
-    const res = await postInspeccion(payload);
+    const res = await postInspeccion(conId);
     // 207 = guardada pero correo no enviado; igual cuenta como enviada.
     if (!res.ok && res.status !== 207) {
       throw new Error(`HTTP ${res.status}`);
@@ -129,8 +133,9 @@ export async function enviarInspeccion(
       correo: json.correoEnviado !== false,
     };
   } catch {
-    // Fallo de red: encolar para reintentar al recuperar conexión.
-    encolar(payload);
+    // Fallo de red (puede que el servidor sí la haya recibido): se encola con el
+    // mismo clientId, así el reintento no genera un duplicado.
+    encolar(conId);
     return { ok: false, pendiente: true };
   }
 }

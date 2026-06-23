@@ -13,6 +13,7 @@ import {
 import { generarPdf } from "@/lib/pdf";
 import { enviarCorreoInspeccion } from "@/lib/email";
 import { subirPdf, storageDisponible } from "@/lib/storage";
+import { Prisma } from "@prisma/client";
 
 // La generación de PDF con Chromium requiere runtime Node (no Edge).
 export const runtime = "nodejs";
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
   const pilotoNombre = parsed.data.pilotoNombre;
   const parqueNombre = parsed.data.parqueNombre;
   const equipoRPA = parsed.data.equipoRPA;
+  const clientId = parsed.data.clientId?.trim() || null;
   const fecha = fechaDesdeInput(fechaInspeccion); // fecha de operación (la ingresa el piloto)
 
   const filas = construirFilas(respuestas);
@@ -52,11 +54,27 @@ export async function POST(req: Request) {
   const resumen = resumir(filas);
   const noItems = itemsEnNo(filas);
 
+  // Idempotencia: si esta inspección (por clientId) ya se guardó, no la repetimos
+  // ni reenviamos el correo. Cubre los reintentos de la cola offline.
+  if (clientId) {
+    const existente = await prisma.inspeccion.findUnique({ where: { clientId } });
+    if (existente) {
+      return NextResponse.json({
+        ok: true,
+        inspeccionId: existente.id,
+        correoEnviado: true,
+        estado: existente.estado,
+        duplicado: true,
+      });
+    }
+  }
+
   // 1) Guardar en base de datos (fecha/hora, piloto, parque, todas las respuestas).
   let inspeccionId: string;
   try {
     const inspeccion = await prisma.inspeccion.create({
       data: {
+        clientId,
         fechaInspeccion: fecha,
         pilotoNombre,
         parqueNombre,
@@ -76,6 +94,24 @@ export async function POST(req: Request) {
     });
     inspeccionId = inspeccion.id;
   } catch (e) {
+    // Carrera entre dos reintentos con el mismo clientId: el segundo choca con la
+    // restricción única → ya existe, lo tratamos como envío exitoso (idempotente).
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === "P2002" &&
+      clientId
+    ) {
+      const existente = await prisma.inspeccion.findUnique({ where: { clientId } });
+      if (existente) {
+        return NextResponse.json({
+          ok: true,
+          inspeccionId: existente.id,
+          correoEnviado: true,
+          estado: existente.estado,
+          duplicado: true,
+        });
+      }
+    }
     console.error("Error al guardar la inspección:", e);
     return NextResponse.json(
       { ok: false, error: "No se pudo guardar la inspección." },

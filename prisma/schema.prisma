@@ -21,6 +21,9 @@ enum ValorRespuesta {
 
 model Inspeccion {
   id              String           @id @default(uuid())
+  // Identificador generado en el cliente para evitar envíos duplicados al reenviar
+  // desde la cola offline (idempotencia "exactamente una vez").
+  clientId        String?          @unique
   creadoEn        DateTime         @default(now())
   fechaInspeccion DateTime
   pilotoNombre    String
