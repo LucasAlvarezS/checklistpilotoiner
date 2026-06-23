@@ -22,6 +22,9 @@ export interface Borrador {
   values: InspeccionInput;
   paso: number;
   listoParaVolar: boolean;
+  // true tras pulsar "Listo para volar" y antes de "Finalizar checklist":
+  // muestra la pantalla "Checklist guardado" mientras el piloto opera el vuelo.
+  enVuelo: boolean;
   updatedAt: number;
 }
 

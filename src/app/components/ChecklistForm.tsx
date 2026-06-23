@@ -84,6 +84,7 @@ export function ChecklistForm() {
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [listoParaVolar, setListoParaVolar] = useState(false);
+  const [enVuelo, setEnVuelo] = useState(false);
   const [pendiente, setPendiente] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +105,7 @@ export function ChecklistForm() {
       reset(b.values);
       setPaso(typeof b.paso === "number" ? b.paso : 0);
       setListoParaVolar(Boolean(b.listoParaVolar));
+      setEnVuelo(Boolean(b.enVuelo));
     }
     restaurado.current = true;
   }, [reset]);
@@ -114,10 +116,10 @@ export function ChecklistForm() {
   useEffect(() => {
     if (!restaurado.current) return;
     const t = setTimeout(() => {
-      guardarBorrador({ values: getValues(), paso, listoParaVolar });
+      guardarBorrador({ values: getValues(), paso, listoParaVolar, enVuelo });
     }, 500);
     return () => clearTimeout(t);
-  }, [valores, paso, listoParaVolar, getValues]);
+  }, [valores, paso, listoParaVolar, enVuelo, getValues]);
 
   const resumenPre = useMemo(() => contar(respuestas, ITEMS_PREVUELO), [respuestas]);
   const resumenPost = useMemo(() => contar(respuestas, ITEMS_POSTVUELO), [respuestas]);
@@ -143,7 +145,13 @@ export function ChecklistForm() {
   const confirmarListoParaVolar = () => {
     if (!preVueloOk) return;
     setListoParaVolar(true);
+    setEnVuelo(true); // muestra "Checklist guardado" hasta pulsar "Finalizar checklist"
     setPaso(2);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const finalizarChecklist = () => {
+    setEnVuelo(false); // continúa con el checklist post-vuelo (paso 2)
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -186,6 +194,7 @@ export function ChecklistForm() {
   const nuevaInspeccion = () => {
     reset(valoresIniciales());
     setListoParaVolar(false);
+    setEnVuelo(false);
     setPendiente(false);
     setPaso(0);
     limpiarBorrador();
@@ -245,7 +254,35 @@ export function ChecklistForm() {
           </section>
         )}
 
-        {!pendiente && (
+        {/* Pantalla intermedia: pre-vuelo guardado, esperando la operación de vuelo */}
+        {!pendiente && enVuelo && (
+          <section className="rounded-xl border border-iner-green/30 bg-white p-6 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-iner-green-50 text-iner-green">
+              <IconCheck size={32} />
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-iner-green">
+              Checklist guardado
+            </h2>
+            <p className="mt-2 text-sm text-iner-gray">
+              La inspección pre-vuelo quedó guardada en este dispositivo. Realiza la
+              operación de vuelo con tranquilidad: esta pantalla se mantiene aunque
+              cierres la app o no tengas conexión.
+            </p>
+            <div className="mt-4 rounded-lg bg-iner-green-50 px-4 py-2 text-sm font-medium text-iner-green">
+              Aeronave lista para volar. Cuando termines la operación, continúa con el
+              checklist post-vuelo.
+            </div>
+            <button
+              type="button"
+              onClick={finalizarChecklist}
+              className="btn-primary mt-6 w-full"
+            >
+              Finalizar checklist
+            </button>
+          </section>
+        )}
+
+        {!pendiente && !enVuelo && (
         <>
         {/* Pasos */}
         <ol className="mb-6 flex items-center gap-2 text-xs font-semibold">
