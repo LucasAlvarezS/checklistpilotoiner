@@ -64,7 +64,7 @@ export default async function Home() {
                 Ingresar con Google
               </button>
               <p className="mt-2 text-center text-xs text-iner-gray">
-                Acceso solo con correo corporativo <strong>@iner.cl</strong>
+                Acceso solo para cuentas <strong>autorizadas</strong>
               </p>
             </form>
           )}
