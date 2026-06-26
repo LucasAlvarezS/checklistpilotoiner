@@ -1,4 +1,4 @@
-import { CHECKLIST, type Valor } from "./checklist-schema";
+import { getChecklist, nombrePais, type Pais, type Valor } from "./checklist-schema";
 import { LOGO_DATA_URI, FIRMA_DATA_URI } from "./assets";
 import {
   formatearFechaSolo,
@@ -7,6 +7,7 @@ import {
 } from "./inspeccion";
 
 interface DatosPdf {
+  pais: Pais;
   pilotoNombre: string;
   parqueNombre: string;
   equipoRPA: string;
@@ -40,11 +41,11 @@ const CHECK_SVG =
 const marca = (valor: Valor, objetivo: Valor) =>
   valor === objetivo ? CHECK_SVG : "";
 
-function construirCuerpo(filas: FilaResultado[]): string {
+function construirCuerpo(filas: FilaResultado[], pais: Pais): string {
   const mapa = new Map(filas.map((f) => [f.id, f]));
   let primeraSub = true;
 
-  return CHECKLIST.map((etapa) => {
+  return getChecklist(pais).map((etapa) => {
     return etapa.subsecciones
       .map((sub, idx) => {
         const filasItems = sub.items
@@ -212,6 +213,7 @@ function construirHtml(datos: DatosPdf): string {
       <table class="cab">
         <tr><td class="k">Piloto</td><td>${esc(datos.pilotoNombre)}</td><td class="k">Parque</td><td>${esc(datos.parqueNombre)}</td></tr>
         <tr><td class="k">Equipo / RPA</td><td>${esc(datos.equipoRPA)}</td><td class="k">Fecha</td><td>${esc(formatearFechaSolo(datos.fecha))}</td></tr>
+        <tr><td class="k">País</td><td colspan="3">${esc(nombrePais(datos.pais))}</td></tr>
       </table>
       <table class="chk">
         <colgroup>
@@ -220,7 +222,7 @@ function construirHtml(datos: DatosPdf): string {
         <tbody class="grp">
           <tr><td class="proc" colspan="5">PROCEDIMIENTOS NORMALES</td></tr>
         </tbody>
-        ${construirCuerpo(datos.filas)}
+        ${construirCuerpo(datos.filas, datos.pais)}
       </table>
     </td></tr></tbody>
   </table>

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { construirWhere } from "@/lib/admin-filtros";
 import { formatearFechaSolo, formatearFecha } from "@/lib/inspeccion";
+import { nombrePais } from "@/lib/checklist-schema";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
     where,
     orderBy: [{ fechaInspeccion: "desc" }, { creadoEn: "desc" }],
     select: {
+      pais: true,
       fechaInspeccion: true,
       creadoEn: true,
       pilotoNombre: true,
@@ -29,6 +31,7 @@ export async function GET(req: Request) {
   const encabezado = [
     "Fecha inspección",
     "Registrado",
+    "País",
     "Piloto",
     "Parque",
     "Equipo/RPA",
@@ -39,6 +42,7 @@ export async function GET(req: Request) {
     [
       formatearFechaSolo(i.fechaInspeccion),
       formatearFecha(i.creadoEn),
+      nombrePais(i.pais),
       i.pilotoNombre,
       i.parqueNombre,
       i.equipoRPA,

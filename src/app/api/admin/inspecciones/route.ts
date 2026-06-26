@@ -21,6 +21,7 @@ export async function GET(req: Request) {
       take: 500,
       select: {
         id: true,
+        pais: true,
         fechaInspeccion: true,
         creadoEn: true,
         pilotoNombre: true,
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     items: items.map((i) => ({
       id: i.id,
+      pais: i.pais,
       fechaInspeccion: i.fechaInspeccion,
       creadoEn: i.creadoEn,
       pilotoNombre: i.pilotoNombre,

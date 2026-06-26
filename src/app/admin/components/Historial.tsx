@@ -9,9 +9,11 @@ import {
   IconMail,
   IconTrash,
 } from "@/app/components/icons";
+import { PAISES, nombrePais, type Pais } from "@/lib/checklist-schema";
 
 interface Item {
   id: string;
+  pais: Pais;
   fechaInspeccion: string;
   creadoEn: string;
   pilotoNombre: string;
@@ -25,11 +27,18 @@ interface Item {
 interface Filtros {
   parque: string;
   piloto: string;
+  pais: string;
   desde: string;
   hasta: string;
 }
 
-const FILTROS_VACIOS: Filtros = { parque: "", piloto: "", desde: "", hasta: "" };
+const FILTROS_VACIOS: Filtros = {
+  parque: "",
+  piloto: "",
+  pais: "",
+  desde: "",
+  hasta: "",
+};
 
 function fmtFecha(iso: string): string {
   return new Intl.DateTimeFormat("es-CL", {
@@ -42,6 +51,7 @@ function toQuery(f: Filtros): string {
   const p = new URLSearchParams();
   if (f.parque) p.set("parque", f.parque);
   if (f.piloto) p.set("piloto", f.piloto);
+  if (f.pais) p.set("pais", f.pais);
   if (f.desde) p.set("desde", f.desde);
   if (f.hasta) p.set("hasta", f.hasta);
   return p.toString();
@@ -135,7 +145,7 @@ export function Historial() {
       {/* Filtros */}
       <form
         onSubmit={aplicar}
-        className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-black/10 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5"
+        className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-black/10 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-6"
       >
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-iner-gray">Parque</span>
@@ -166,6 +176,21 @@ export function Historial() {
               <option key={p} value={p} />
             ))}
           </datalist>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-iner-gray">País</span>
+          <select
+            value={filtros.pais}
+            onChange={(e) => setFiltros({ ...filtros, pais: e.target.value })}
+            className="campo"
+          >
+            <option value="">Todos</option>
+            {PAISES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-iner-gray">Desde</span>
@@ -225,6 +250,7 @@ export function Historial() {
           <thead className="bg-iner-gray-100 text-left text-xs uppercase text-iner-gray">
             <tr>
               <th className="px-4 py-3">Fecha</th>
+              <th className="px-4 py-3">País</th>
               <th className="px-4 py-3">Piloto</th>
               <th className="px-4 py-3">Parque</th>
               <th className="px-4 py-3">Equipo / RPA</th>
@@ -236,6 +262,7 @@ export function Historial() {
             {items.map((i) => (
               <tr key={i.id} className="border-t border-black/5">
                 <td className="px-4 py-3 whitespace-nowrap">{fmtFecha(i.fechaInspeccion)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">{nombrePais(i.pais)}</td>
                 <td className="px-4 py-3">{i.pilotoNombre}</td>
                 <td className="px-4 py-3">{i.parqueNombre}</td>
                 <td className="px-4 py-3">{i.equipoRPA}</td>
@@ -255,7 +282,7 @@ export function Historial() {
             ))}
             {!cargando && items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-iner-gray">
+                <td colSpan={7} className="px-4 py-8 text-center text-iner-gray">
                   No hay inspecciones para los filtros seleccionados.
                 </td>
               </tr>
@@ -276,7 +303,7 @@ export function Historial() {
               <EstadoBadge estado={i.estado} totalNo={i.totalNo} />
             </div>
             <p className="mt-2 text-xs text-iner-gray">
-              {fmtFecha(i.fechaInspeccion)} · {i.equipoRPA}
+              {fmtFecha(i.fechaInspeccion)} · {nombrePais(i.pais)} · {i.equipoRPA}
             </p>
             <div className="mt-3">
               <Acciones

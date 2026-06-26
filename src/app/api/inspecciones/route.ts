@@ -42,14 +42,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const { fechaInspeccion, respuestas } = parsed.data;
+  const { pais, fechaInspeccion, respuestas } = parsed.data;
   const pilotoNombre = parsed.data.pilotoNombre;
   const parqueNombre = parsed.data.parqueNombre;
   const equipoRPA = parsed.data.equipoRPA;
   const clientId = parsed.data.clientId?.trim() || null;
   const fecha = fechaDesdeInput(fechaInspeccion); // fecha de operación (la ingresa el piloto)
 
-  const filas = construirFilas(respuestas);
+  const filas = construirFilas(respuestas, pais);
   const estado = calcularEstado(filas);
   const resumen = resumir(filas);
   const noItems = itemsEnNo(filas);
@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     const inspeccion = await prisma.inspeccion.create({
       data: {
         clientId,
+        pais,
         fechaInspeccion: fecha,
         pilotoNombre,
         parqueNombre,
@@ -124,6 +125,7 @@ export async function POST(req: Request) {
   const archivoPdf = nombrePdf(parqueNombre, pilotoNombre, fecha);
   try {
     const pdf = await generarPdf({
+      pais,
       pilotoNombre,
       parqueNombre,
       equipoRPA,

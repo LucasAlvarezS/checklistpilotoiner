@@ -1,4 +1,4 @@
-import { ITEMS_PLANOS, type ItemPlano, type Valor } from "./checklist-schema";
+import { getItemsPlanos, type ItemPlano, type Pais, type Valor } from "./checklist-schema";
 import type { InspeccionInput } from "./validation";
 
 /**
@@ -24,11 +24,12 @@ export interface FilaResultado extends ItemPlano {
   observacion: string;
 }
 
-/** Aplana las respuestas del formulario al orden del formato. */
+/** Aplana las respuestas del formulario al orden del formato del país. */
 export function construirFilas(
   respuestas: InspeccionInput["respuestas"],
+  pais: Pais,
 ): FilaResultado[] {
-  return ITEMS_PLANOS.map((item) => {
+  return getItemsPlanos(pais).map((item) => {
     const r = respuestas[item.id];
     return {
       ...item,

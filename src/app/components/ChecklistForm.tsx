@@ -6,13 +6,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  ETAPAS_PREVUELO_LISTA,
-  ETAPAS_POSTVUELO_LISTA,
-  ITEMS_PLANOS,
-  ITEMS_PREVUELO,
-  ITEMS_POSTVUELO,
+  getEtapasPrevuelo,
+  getEtapasPostvuelo,
+  getItemsPlanos,
+  getItemsPrevuelo,
+  getItemsPostvuelo,
+  nombrePais,
   type Etapa,
   type ItemPlano,
+  type Pais,
   type Valor,
 } from "@/lib/checklist-schema";
 import { inspeccionSchema, type InspeccionInput } from "@/lib/validation";
@@ -35,12 +37,13 @@ function hoyLocal(): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-function valoresIniciales(): InspeccionInput {
+function valoresIniciales(pais: Pais): InspeccionInput {
   const respuestas: InspeccionInput["respuestas"] = {};
-  for (const it of ITEMS_PLANOS) {
+  for (const it of getItemsPlanos(pais)) {
     respuestas[it.id] = { valor: undefined as unknown as Valor, observacion: "" };
   }
   return {
+    pais,
     fechaInspeccion: hoyLocal(),
     pilotoNombre: "",
     parqueNombre: "",
@@ -78,8 +81,16 @@ function contar(
   return { respondidos: sies + noes + nas, sies, noes, nas, itemsNo, total: items.length };
 }
 
-export function ChecklistForm() {
+export function ChecklistForm({ pais }: { pais: Pais }) {
   const router = useRouter();
+
+  // Ítems y etapas del país seleccionado (el checklist depende del país).
+  const itemsPlanos = useMemo(() => getItemsPlanos(pais), [pais]);
+  const itemsPrevuelo = useMemo(() => getItemsPrevuelo(pais), [pais]);
+  const itemsPostvuelo = useMemo(() => getItemsPostvuelo(pais), [pais]);
+  const etapasPrevuelo = useMemo(() => getEtapasPrevuelo(pais), [pais]);
+  const etapasPostvuelo = useMemo(() => getEtapasPostvuelo(pais), [pais]);
+
   const [paso, setPaso] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
@@ -90,7 +101,7 @@ export function ChecklistForm() {
 
   const metodos = useForm<InspeccionInput>({
     resolver: zodResolver(inspeccionSchema),
-    defaultValues: valoresIniciales(),
+    defaultValues: valoresIniciales(pais),
     mode: "onTouched",
   });
 
@@ -101,14 +112,18 @@ export function ChecklistForm() {
   const restaurado = useRef(false);
   useEffect(() => {
     const b = leerBorrador();
-    if (b?.values) {
+    // Solo restauramos si el borrador es del mismo país: los ids/ítems difieren
+    // entre países, así que un borrador de otro país no debe mezclarse.
+    if (b?.values && b.values.pais === pais) {
       reset(b.values);
       setPaso(typeof b.paso === "number" ? b.paso : 0);
       setListoParaVolar(Boolean(b.listoParaVolar));
       setEnVuelo(Boolean(b.enVuelo));
+    } else {
+      reset(valoresIniciales(pais));
     }
     restaurado.current = true;
-  }, [reset]);
+  }, [reset, pais]);
 
   const valores = useWatch({ control });
   const respuestas = valores?.respuestas as InspeccionInput["respuestas"] | undefined;
@@ -121,13 +136,22 @@ export function ChecklistForm() {
     return () => clearTimeout(t);
   }, [valores, paso, listoParaVolar, enVuelo, getValues]);
 
-  const resumenPre = useMemo(() => contar(respuestas, ITEMS_PREVUELO), [respuestas]);
-  const resumenPost = useMemo(() => contar(respuestas, ITEMS_POSTVUELO), [respuestas]);
-  const resumenTotal = useMemo(() => contar(respuestas, ITEMS_PLANOS), [respuestas]);
+  const resumenPre = useMemo(
+    () => contar(respuestas, itemsPrevuelo),
+    [respuestas, itemsPrevuelo],
+  );
+  const resumenPost = useMemo(
+    () => contar(respuestas, itemsPostvuelo),
+    [respuestas, itemsPostvuelo],
+  );
+  const resumenTotal = useMemo(
+    () => contar(respuestas, itemsPlanos),
+    [respuestas, itemsPlanos],
+  );
 
   const preVueloOk = useMemo(
-    () => itemsValidos(respuestas, ITEMS_PREVUELO),
-    [respuestas],
+    () => itemsValidos(respuestas, itemsPrevuelo),
+    [respuestas, itemsPrevuelo],
   );
 
   const irAPrevuelo = async () => {
@@ -192,7 +216,7 @@ export function ChecklistForm() {
   };
 
   const nuevaInspeccion = () => {
-    reset(valoresIniciales());
+    reset(valoresIniciales(pais));
     setListoParaVolar(false);
     setEnVuelo(false);
     setPendiente(false);
@@ -203,7 +227,7 @@ export function ChecklistForm() {
 
   const onInvalid = () => {
     // Llevar al piloto a la fase donde están los ítems pendientes.
-    const preOk = itemsValidos(getValues("respuestas"), ITEMS_PREVUELO);
+    const preOk = itemsValidos(getValues("respuestas"), itemsPrevuelo);
     setPaso(preOk ? 2 : 1);
     setErrorEnvio(
       "Hay ítems sin responder o sin observación. Revisa los campos marcados.",
@@ -225,7 +249,9 @@ export function ChecklistForm() {
             <h1 className="text-base font-bold text-iner-green sm:text-lg">
               Checklist Inspecciones Externas
             </h1>
-            <p className="text-xs text-iner-gray">Inspección RPA · OPE-PR-01</p>
+            <p className="text-xs text-iner-gray">
+              Inspección RPA · OPE-PR-01 · {nombrePais(pais)}
+            </p>
           </div>
         </header>
 
@@ -382,7 +408,7 @@ export function ChecklistForm() {
               </p>
               <button
                 type="button"
-                onClick={() => marcarTodoSi(ITEMS_PREVUELO)}
+                onClick={() => marcarTodoSi(itemsPrevuelo)}
                 className="btn-primary inline-flex w-full items-center justify-center gap-2"
               >
                 <IconCheck size={18} />
@@ -394,7 +420,7 @@ export function ChecklistForm() {
               </p>
             </div>
 
-            <ListaEtapas etapas={ETAPAS_PREVUELO_LISTA} />
+            <ListaEtapas etapas={etapasPrevuelo} />
 
             <div ref={finRef} className="space-y-3">
               {preVueloOk ? (
@@ -444,7 +470,7 @@ export function ChecklistForm() {
               </p>
               <button
                 type="button"
-                onClick={() => marcarTodoSi(ITEMS_POSTVUELO)}
+                onClick={() => marcarTodoSi(itemsPostvuelo)}
                 className="btn-primary inline-flex w-full items-center justify-center gap-2"
               >
                 <IconCheck size={18} />
@@ -455,7 +481,7 @@ export function ChecklistForm() {
               </p>
             </div>
 
-            <ListaEtapas etapas={ETAPAS_POSTVUELO_LISTA} />
+            <ListaEtapas etapas={etapasPostvuelo} />
 
             <div ref={finRef} className="flex gap-3">
               <button

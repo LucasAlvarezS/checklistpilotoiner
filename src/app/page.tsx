@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { auth, signIn, signOut } from "@/auth";
 import { InstallButton } from "./components/InstallButton";
+import { SelectorPais } from "./components/SelectorPais";
 
 export default async function Home() {
   const session = await auth();
@@ -75,12 +76,7 @@ export default async function Home() {
             <span className="h-px flex-1 bg-black/10" />
           </div>
 
-          <Link href="/checklist" className="btn-primary block w-full text-center">
-            Entrar como piloto
-          </Link>
-          <p className="mt-2 text-center text-xs text-iner-gray">
-            Completa el checklist de inspección en terreno.
-          </p>
+          <SelectorPais />
 
           <InstallButton />
         </div>

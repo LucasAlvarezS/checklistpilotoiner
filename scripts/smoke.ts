@@ -4,13 +4,14 @@
  *   - sin argumento: envía una inspección con TODO en SÍ.
  *   - "conobs": marca un ítem en NO con observación.
  */
-import { ITEMS_PLANOS } from "../src/lib/checklist-schema";
+import { getItemsPlanos, esPaisValido, PAIS_POR_DEFECTO } from "../src/lib/checklist-schema";
 
 const conObs = process.argv[2] === "conobs";
 const URL = process.env.URL ?? "http://localhost:3000/api/inspecciones";
+const pais = esPaisValido(process.env.PAIS) ? process.env.PAIS : PAIS_POR_DEFECTO;
 
 const respuestas: Record<string, { valor: string; observacion?: string }> = {};
-ITEMS_PLANOS.forEach((it, i) => {
+getItemsPlanos(pais).forEach((it, i) => {
   if (conObs && i === 3) {
     respuestas[it.id] = {
       valor: "NO",
@@ -23,6 +24,7 @@ ITEMS_PLANOS.forEach((it, i) => {
 
 const hoy = new Date().toISOString().slice(0, 10);
 const payload = {
+  pais,
   fechaInspeccion: hoy,
   revision: "03",
   codigo: process.argv[3] ?? "01",

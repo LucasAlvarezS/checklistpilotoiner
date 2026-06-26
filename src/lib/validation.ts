@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ITEMS_PLANOS } from "./checklist-schema";
+import { getItemsPlanos } from "./checklist-schema";
 
 export const valorEnum = z.enum(["SI", "NO", "NA"]);
 
@@ -17,6 +17,7 @@ export const respuestaSchema = z.object({
  */
 export const inspeccionSchema = z
   .object({
+    pais: z.enum(["CHILE", "ARGENTINA"]),
     fechaInspeccion: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Selecciona la fecha de la inspección"),
@@ -29,7 +30,7 @@ export const inspeccionSchema = z
     respuestas: z.record(z.string(), respuestaSchema),
   })
   .superRefine((data, ctx) => {
-    for (const item of ITEMS_PLANOS) {
+    for (const item of getItemsPlanos(data.pais)) {
       const r = data.respuestas[item.id];
       if (!r || !r.valor) {
         ctx.addIssue({
