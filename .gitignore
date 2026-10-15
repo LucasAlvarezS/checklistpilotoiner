@@ -44,3 +44,7 @@ next-env.d.ts
 # Documentación interna (repo público): no versionar
 /*.md
 !/README.md
+
+# Documentos operativos internos (repo público): no versionar
+/*.pdf
+/*.docx
