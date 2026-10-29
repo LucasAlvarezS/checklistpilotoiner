@@ -21,5 +21,18 @@ jobs:
           if [ -z "$SUPABASE_DB_URL" ]; then
             echo "Falta el secret SUPABASE_DB_URL"; exit 1
           fi
-          psql "$SUPABASE_DB_URL" -tAc "select 1;"
-          echo "Ping OK: $(date -u) UTC"
+          if psql "$SUPABASE_DB_URL" -tAc "select 1;" >/dev/null 2>&1; then
+            echo "Ping OK: $(date -u) UTC"
+            exit 0
+          fi
+
+          if [[ "$SUPABASE_DB_URL" == *".pooler.supabase.com"* ]] && [[ "$SUPABASE_DB_URL" =~ ^postgres(ql)?://postgres\.[^:]+: ]]; then
+            SUPABASE_DB_URL_NORMALIZED="$(printf '%s' "$SUPABASE_DB_URL" | sed -E 's#^(postgres(ql)?://)postgres\.[^:]+:#\1postgres:#')"
+            echo "Reintentando ping con usuario de pooler normalizado..."
+            psql "$SUPABASE_DB_URL_NORMALIZED" -tAc "select 1;"
+            echo "Ping OK: $(date -u) UTC"
+            exit 0
+          fi
+
+          echo "No se pudo conectar a Supabase con SUPABASE_DB_URL."
+          exit 1
